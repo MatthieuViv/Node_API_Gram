@@ -2,6 +2,14 @@ const express = require('express');
 const mysql = require('mysql');
 const crypto = require('crypto');
 const uuid = require('uuid');
+const emailValidator = require("email-validator");
+const libPhoneNumber = require('libphonenumber-js');
+
+const querySelectUser = 'SELECT * FROM utilisateurs where email=?';
+const queryInsertUser = 'INSERT INTO utilisateurs (email, nom, prenom, mot_de_passe, telephone, adresse, date_inscription, salt, last_connection, unique_id) VALUES (?,?,?,?,?,?, NOW(), ?, NOW(), ?)'
+const queryUpdateUser = 'UPDATE utilisateurs SET last_connection = NOW(), unique_id = ? WHERE email =?';
+const querySelectTokenFromUser = 'SELECT unique_id FROM utilisateurs where email=?';
+
 
 let genRandomString = function(length){
     return crypto.randomBytes(Math.ceil(length/2))
@@ -30,9 +38,15 @@ function checkhashPassword(user_password, salt) {
     return passwordData;
 }
 
-function checkVallidityOfUserDetails(){
+function checkValidityOfUserDetails(email){
+    return emailValidator.validate(email);
+}
 
-    return true;
+function convertToInternationalFormat(phoneNumber){
+    let asYouType = new libPhoneNumber.AsYouType('FR').input(phoneNumber);
+    let phoneNumberFromString = libPhoneNumber.parsePhoneNumberFromString(asYouType, 'FR');
+    let internationalFormat = phoneNumberFromString.formatInternational();
+    return internationalFormat.replace(/\s+/g, '');
 }
 
 const router = express.Router();
@@ -54,12 +68,13 @@ router.get('/users', (req, res) => {
 
 router.post('/users/register/',(req, res, next)=> {
 
+    console.log('users/register: ')
+
     const connection = getConnection();
 
     let post_data = req.body; //Get POST params
 
     let uid = uuid.v4();
-    console.log(uid);
     let plaint_password = post_data.password; //Get the plaintext password
     let hash_data = saltHashPassword(plaint_password);
     let password = hash_data.passwordHash;
@@ -69,9 +84,10 @@ router.post('/users/register/',(req, res, next)=> {
     let name = post_data.name;
     let firstName = post_data.firstName;
     let phoneNumber = post_data.phoneNumber;
+    phoneNumber = convertToInternationalFormat(phoneNumber);
     let address = post_data.address;
 
-    connection.query('SELECT * FROM utilisateurs where email=?', [email] , function(err, result, fields) {
+    connection.query(querySelectUser, [email] , function(err, result, fields) {
         connection.on('error', function (err) {
             console.log('[MySQL ERROR', err);
         });
@@ -79,8 +95,8 @@ router.post('/users/register/',(req, res, next)=> {
             res.json('User already exists !!! ');
         }
         else {
-            let queryInsert = 'INSERT INTO utilisateurs (email, nom, prenom, mot_de_passe, telephone, adresse, date_inscription, salt, last_connection, unique_id) VALUES (?,?,?,?,?,?, NOW(), ?, NOW(), ?)';
-            connection.query(queryInsert, [email, name, firstName, password, phoneNumber, address, salt, uid], (err, result, fields) => {
+            ;
+            connection.query(queryInsertUser, [email, name, firstName, password, phoneNumber, address, salt, uid], (err, result, fields) => {
                 connection.on('error', function (err) {
                     console.log('[MySQL ERROR', err);
                     res.json('Register error: ', err);
@@ -93,37 +109,55 @@ router.post('/users/register/',(req, res, next)=> {
 });
 
 router.post('/users/login', (req, res, next)=> {
+
+    console.log('users/login: ')
     const  connection = getConnection();
 
     let post_data = req.body;
     let user_password = post_data.password;
     let user_email = post_data.email;
-    connection.query('SELECT * FROM utilisateurs where email=?', [user_email] , function(err, result, fields) {
-        connection.on('error', function (err) {
-            console.log('[MySQL ERROR]', err);
+    console.log(user_email);
+
+    if (checkValidityOfUserDetails(user_email)) {
+        connection.query(querySelectUser, [user_email] , function(err, result, fields) {
+            connection.on('error', function (err) {
+                console.log('[MySQL ERROR]', err);
+            });
+            // console.log(result);
+            if (result && result.length ){
+                let salt = result[0].salt;
+                let encrypted_password = result[0].mot_de_passe;
+                let hashed_password = checkhashPassword(user_password, salt).passwordHash;
+                let newToken = uuid.v4();
+                if (encrypted_password == hashed_password) {
+                    connection.query(queryUpdateUser, [newToken, user_email], function (err, result, fields) {
+                        connection.on('error', function (err) {
+                           console.log('[MySQL ERROR]', err);
+                        });
+                        if (result){
+                            connection.query(querySelectTokenFromUser, [user_email], function (err, result, fields) {
+                                connection.on('error', function (err) {
+                                    console.log('[MySQL ERROR]', err);
+                                });
+                                res.end(JSON.stringify(result[0])); //Send the token back to the user
+                            });
+                        }
+                        console.log('User last_connection updated');
+                        // res.end(JSON.stringify(result[0])) //If password is true, return all info of user
+                    });
+                } else
+                    res.end(JSON.stringify('Wrong password'))
+            }
+            else {
+                console.log('User does not exist');
+                res.json('User does not exist');
+            }
         });
-        console.log(result);
-        if (result && result.length ){
-            let salt = result[0].salt;
-            let encrypted_password = result[0].mot_de_passe;
-            let hashed_password = checkhashPassword(user_password, salt).passwordHash;
-            if (encrypted_password == hashed_password) {
-                let queryUpdateUser = 'UPDATE utilisateurs SET last_connection = NOW() WHERE email =?';
-                connection.query(queryUpdateUser, [user_email], (err, result, fields) => {
-                    console.log('User last_connection updated');
-                });
-                res.end(JSON.stringify(result[0])) //If password is true, return all info of user
-            } else
-                res.end(JSON.stringify('Wrong password'))
-        }
-        else {
-            console.log('User does not exist');
-            res.json('User does not exist');
-        }
-    });
+    } else {
+        res.end("The input fields are not valid");
+    }
 
 });
-
 
 
 function getConnection() {

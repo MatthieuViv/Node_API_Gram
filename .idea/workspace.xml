@@ -2,9 +2,10 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="bae34e5a-c8be-496d-bf1a-b82327f1ee33" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/index.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/package-lock.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/routes/user.js" beforeDir="false" afterPath="$PROJECT_DIR$/routes/user.js" afterDir="false" />
     </list>
     <ignored path="$PROJECT_DIR$/.tmp/" />
@@ -30,11 +31,8 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/index.js">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="68">
-              <caret line="4" column="38" selection-start-line="4" selection-start-column="38" selection-end-line="4" selection-end-column="38" />
-              <folding>
-                <element signature="e#995#1244#0" />
-              </folding>
+            <state relative-caret-position="187">
+              <caret line="11" column="40" selection-start-line="11" selection-start-column="40" selection-end-line="11" selection-end-column="40" />
             </state>
           </provider>
         </entry>
@@ -42,15 +40,15 @@
       <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/routes/user.js">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="-449">
-              <caret line="33" selection-start-line="33" selection-end-line="33" />
+            <state relative-caret-position="418">
+              <caret line="141" column="101" selection-start-line="141" selection-start-column="101" selection-end-line="141" selection-end-column="101" />
               <folding>
                 <element signature="e#171#279#0" />
                 <element signature="e#320#528#0" />
                 <element signature="n#!!block;n#saltHashPassword#0" />
                 <element signature="n#!!block;n#checkhashPassword#0" />
+                <element signature="n#!!block;n#checkUserDetails#0" />
                 <element signature="e#239#573#0" />
-                <element signature="e#2786#4066#0" />
                 <element signature="n#!!block;n#getConnection#0" />
               </folding>
             </state>
@@ -65,6 +63,11 @@
         <option value="JavaScript File" />
       </list>
     </option>
+  </component>
+  <component name="FindInProjectRecents">
+    <findStrings>
+      <find>console</find>
+    </findStrings>
   </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
@@ -94,6 +97,11 @@
             <path>
               <item name="gram_api" type="b2602c69:ProjectViewProjectNode" />
               <item name="gram_api" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="gram_api" type="b2602c69:ProjectViewProjectNode" />
+              <item name="gram_api" type="462c0819:PsiDirectoryNode" />
+              <item name="routes" type="462c0819:PsiDirectoryNode" />
             </path>
           </expand>
           <select />
@@ -133,12 +141,12 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1563982288743</updated>
-      <workItem from="1563982290487" duration="2368000" />
+      <workItem from="1563982290487" duration="16590000" />
     </task>
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="2368000" />
+    <option name="totallyTimeSpent" value="16590000" />
   </component>
   <component name="ToolWindowManager">
     <frame x="-8" y="-8" width="2576" height="1056" extended-state="6" />
@@ -203,25 +211,22 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/index.js">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="68">
-          <caret line="4" column="38" selection-start-line="4" selection-start-column="38" selection-end-line="4" selection-end-column="38" />
-          <folding>
-            <element signature="e#995#1244#0" />
-          </folding>
+        <state relative-caret-position="187">
+          <caret line="11" column="40" selection-start-line="11" selection-start-column="40" selection-end-line="11" selection-end-column="40" />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/routes/user.js">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-449">
-          <caret line="33" selection-start-line="33" selection-end-line="33" />
+        <state relative-caret-position="418">
+          <caret line="141" column="101" selection-start-line="141" selection-start-column="101" selection-end-line="141" selection-end-column="101" />
           <folding>
             <element signature="e#171#279#0" />
             <element signature="e#320#528#0" />
             <element signature="n#!!block;n#saltHashPassword#0" />
             <element signature="n#!!block;n#checkhashPassword#0" />
+            <element signature="n#!!block;n#checkUserDetails#0" />
             <element signature="e#239#573#0" />
-            <element signature="e#2786#4066#0" />
             <element signature="n#!!block;n#getConnection#0" />
           </folding>
         </state>

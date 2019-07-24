@@ -10,10 +10,6 @@ app.use(user);
 
 app.get('/', (req, res, next) => {
     console.log('THIS IS A / GET CALL');
-    console.log('Password: 123456');
-    let encrypt = saltHashPassword("123456");
-    console.log('Encrypt: ' + encrypt.passwordHash);
-    console.log('Salt: '+ encrypt.salt);
     res.send('Hello World')
 });
 
