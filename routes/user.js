@@ -4,11 +4,12 @@ const crypto = require('crypto');
 const uuid = require('uuid');
 const emailValidator = require("email-validator");
 const libPhoneNumber = require('libphonenumber-js');
+const HttpStatus = require('http-status-codes');
 
 const querySelectUser = 'SELECT * FROM utilisateurs where email=?';
-const queryInsertUser = 'INSERT INTO utilisateurs (email, nom, prenom, mot_de_passe, telephone, adresse, date_inscription, salt, last_connection, unique_id) VALUES (?,?,?,?,?,?, NOW(), ?, NOW(), ?)'
-const queryUpdateUser = 'UPDATE utilisateurs SET last_connection = NOW(), unique_id = ? WHERE email =?';
-const querySelectTokenFromUser = 'SELECT unique_id FROM utilisateurs where email=?';
+const queryInsertUser = 'INSERT INTO utilisateurs (email, nom, prenom, mot_de_passe, telephone, adresse, date_inscription, salt, last_connection, connection_token) VALUES (?,?,?,?,?,?, NOW(), ?, NOW(), ?)'
+const queryUpdateUser = 'UPDATE utilisateurs SET last_connection = NOW(), connection_token = ? WHERE email =?';
+const querySelectTokenFromUser = 'SELECT connection_token FROM utilisateurs where email=?';
 
 
 let genRandomString = function(length){
@@ -33,13 +34,9 @@ function saltHashPassword(userPassword){
     return passwordData;
 }
 
-function checkhashPassword(user_password, salt) {
+function checkHashPassword(user_password, salt) {
     let passwordData = sha512(user_password, salt);
     return passwordData;
-}
-
-function checkValidityOfUserDetails(email){
-    return emailValidator.validate(email);
 }
 
 function convertToInternationalFormat(phoneNumber){
@@ -47,6 +44,21 @@ function convertToInternationalFormat(phoneNumber){
     let phoneNumberFromString = libPhoneNumber.parsePhoneNumberFromString(asYouType, 'FR');
     let internationalFormat = phoneNumberFromString.formatInternational();
     return internationalFormat.replace(/\s+/g, '');
+}
+
+function checkEmailValidity(email){
+    return emailValidator.validate(email);
+}
+
+function checkIfFieldsAreEmpty(... allFields){
+    console.log('checkUserInput : ' +allFields);
+    for (field  of allFields) {
+        if (field.toString().trim().length === 0){
+            console.log(field);
+            return false
+        }
+    }
+    return true;
 }
 
 const router = express.Router();
@@ -68,58 +80,64 @@ router.get('/users', (req, res) => {
 
 router.post('/users/register/',(req, res, next)=> {
 
-    console.log('users/register: ')
-
     const connection = getConnection();
 
     let post_data = req.body; //Get POST params
+    console.log('post_data : '+JSON.stringify(post_data))
 
     let uid = uuid.v4();
-    let plaint_password = post_data.password; //Get the plaintext password
+    let plaint_password = post_data.inputPassword; //Get the plaintext userPassword
     let hash_data = saltHashPassword(plaint_password);
-    let password = hash_data.passwordHash;
+    let userPassword = hash_data.passwordHash;
     let salt = hash_data.salt;
 
-    let email = post_data.email;
-    let name = post_data.name;
-    let firstName = post_data.firstName;
-    let phoneNumber = post_data.phoneNumber;
-    phoneNumber = convertToInternationalFormat(phoneNumber);
-    let address = post_data.address;
+    let inputEmail = post_data.inputEmail;
+    let inputName = post_data.inputName;
+    let inputFirstName = post_data.inputFirstName;
+    let inputPhoneNumber = post_data.inputPhoneNumber;
+    let inputPostalAddress = post_data.inputPostalAddress;
 
-    connection.query(querySelectUser, [email] , function(err, result, fields) {
-        connection.on('error', function (err) {
-            console.log('[MySQL ERROR', err);
-        });
-        if (result && result.length ){
-            res.json('User already exists !!! ');
-        }
-        else {
-            ;
-            connection.query(queryInsertUser, [email, name, firstName, password, phoneNumber, address, salt, uid], (err, result, fields) => {
+    if(checkIfFieldsAreEmpty(inputName, inputFirstName, inputEmail, inputPhoneNumber, inputPostalAddress, plaint_password)){
+        inputPhoneNumber = convertToInternationalFormat(inputPhoneNumber);
+        if (checkIfFieldsAreEmpty(inputName, inputFirstName, inputEmail, inputPhoneNumber, inputPostalAddress, plaint_password) && checkEmailValidity(inputEmail)){
+            connection.query(querySelectUser, [inputEmail] , function(err, result, fields) {
                 connection.on('error', function (err) {
                     console.log('[MySQL ERROR', err);
-                    res.json('Register error: ', err);
                 });
-                // res.json(result);
-                res.json('Register successful');
+                if (result && result.length ){
+                    res.status(HttpStatus.CONFLICT).send('User Already Exists');
+                }
+                else {
+                    connection.query(queryInsertUser, [inputEmail, inputName, inputFirstName, userPassword, inputPhoneNumber, inputPostalAddress, salt, uid], (err, result, fields) => {
+                        connection.on('error', function (err) {
+                            console.log('[MySQL ERROR', err);
+                            res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Register error: ', err);
+                        });
+                        res.status(HttpStatus.CREATED).send('User Created Successfully');
+                    });
+                }
             });
         }
-    });
+        else {
+            res.status(HttpStatus.BAD_REQUEST).send('User Input are not correct');
+        }
+    } else {
+        res.status(HttpStatus.BAD_REQUEST).send('At least one input is empty');
+    }
+
 });
 
 router.post('/users/login', (req, res, next)=> {
 
-    console.log('users/login: ')
+    console.log('users/login: ');
     const  connection = getConnection();
 
     let post_data = req.body;
-    let user_password = post_data.password;
-    let user_email = post_data.email;
-    console.log(user_email);
+    let inputPassword = post_data.inputPassword;
+    let inputEmail = post_data.inputEmail;
 
-    if (checkValidityOfUserDetails(user_email)) {
-        connection.query(querySelectUser, [user_email] , function(err, result, fields) {
+    if (checkIfFieldsAreEmpty(inputEmail, inputPassword) && checkEmailValidity(inputEmail)) {
+        connection.query(querySelectUser, [inputEmail] , function(err, result, fields) {
             connection.on('error', function (err) {
                 console.log('[MySQL ERROR]', err);
             });
@@ -127,19 +145,21 @@ router.post('/users/login', (req, res, next)=> {
             if (result && result.length ){
                 let salt = result[0].salt;
                 let encrypted_password = result[0].mot_de_passe;
-                let hashed_password = checkhashPassword(user_password, salt).passwordHash;
+                let hashed_password = checkHashPassword(inputPassword, salt).passwordHash;
                 let newToken = uuid.v4();
-                if (encrypted_password == hashed_password) {
-                    connection.query(queryUpdateUser, [newToken, user_email], function (err, result, fields) {
+                if (encrypted_password === hashed_password) {
+                    connection.query(queryUpdateUser, [newToken, inputEmail], function (err, result, fields) {
                         connection.on('error', function (err) {
                            console.log('[MySQL ERROR]', err);
                         });
-                        if (result){
-                            connection.query(querySelectTokenFromUser, [user_email], function (err, result, fields) {
+                        if (typeof result !== typeof undefined){
+                            connection.query(querySelectTokenFromUser, [inputEmail], function (err, result, fields) {
                                 connection.on('error', function (err) {
                                     console.log('[MySQL ERROR]', err);
                                 });
-                                res.end(JSON.stringify(result[0])); //Send the token back to the user
+                                if (typeof result[0] !== typeof undefined){
+                                    res.status(HttpStatus.OK).send(JSON.stringify(result[0])); //Send the token back to the user
+                                }
                             });
                         }
                         console.log('User last_connection updated');
@@ -150,11 +170,11 @@ router.post('/users/login', (req, res, next)=> {
             }
             else {
                 console.log('User does not exist');
-                res.json('User does not exist');
+                res.status(HttpStatus.BAD_REQUEST).json('User does not exist');
             }
         });
     } else {
-        res.end("The input fields are not valid");
+        res.status(HttpStatus.BAD_REQUEST).send('User Input are not correct');
     }
 
 });

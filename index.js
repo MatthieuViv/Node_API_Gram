@@ -1,12 +1,17 @@
 const express = require('express');
 const app = express();
 const bodyParser = require('body-parser');
+const morgan = require('morgan');
+
 
 const user = require('./routes/user');
+const category = require('./routes/category');
 
+app.use(morgan('short'));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({extended: true}));
 app.use(user);
+app.use(category);
 
 app.get('/', (req, res, next) => {
     console.log('THIS IS A / GET CALL');
