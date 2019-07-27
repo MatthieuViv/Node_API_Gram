@@ -2,11 +2,7 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="bae34e5a-c8be-496d-bf1a-b82327f1ee33" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/routes/order.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/index.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/routes/category.js" beforeDir="false" afterPath="$PROJECT_DIR$/routes/category.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/routes/user.js" beforeDir="false" afterPath="$PROJECT_DIR$/routes/user.js" afterDir="false" />
     </list>
     <ignored path="$PROJECT_DIR$/.tmp/" />
     <ignored path="$PROJECT_DIR$/temp/" />
@@ -31,20 +27,15 @@
       <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/routes/user.js">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="227">
-              <caret line="204" column="5" selection-start-line="204" selection-start-column="5" selection-end-line="204" selection-end-column="5" />
+            <state relative-caret-position="443">
+              <caret line="207" column="47" selection-start-line="207" selection-start-column="47" selection-end-line="207" selection-end-column="47" />
               <folding>
-                <element signature="e#734#842#0" />
-                <element signature="e#883#1091#0" />
                 <element signature="n#!!block;n#saltHashPassword#0" />
-                <element signature="n#!!block;n#checkhashPassword#0" />
                 <element signature="n#!!block;n#convertToInternationalFormat#0" />
-                <element signature="n#!!block;n#checkValidityOfUserDetails#0" />
-                <element signature="n#!!block;n#checkUserInput#0" />
-                <element signature="n#!!block;n#checkIfFieldsAreEmptyOrUndefined#1" />
-                <element signature="e#1888#2234#0" />
-                <element signature="e#2622#4570#0" />
-                <element signature="e#9713#12120#0" />
+                <element signature="e#2735#3073#0" />
+                <element signature="e#3126#6484#0" />
+                <element signature="e#6535#8918#0" />
+                <element signature="e#8969#12986#0" />
                 <element signature="n#!!block;n#getConnection#0" />
               </folding>
             </state>
@@ -57,7 +48,6 @@
             <state relative-caret-position="85">
               <caret line="5" selection-start-line="5" selection-end-line="5" selection-end-column="36" />
               <folding>
-                <element signature="e#406#1162#0" />
                 <element signature="n#!!block;n#getConnection#0" />
               </folding>
             </state>
@@ -67,12 +57,11 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/routes/order.js">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="-187">
+            <state relative-caret-position="119">
               <caret line="7" selection-start-line="7" selection-end-line="7" selection-end-column="128" />
               <folding>
                 <element signature="n#!!block;n#checkIfFieldsAreEmpty#0" />
                 <element signature="n#!!block;n#checkIfFieldsAreUndefined#0" />
-                <element signature="e#805#1347#0" />
                 <element signature="n#!!block;n#getConnection#0" />
               </folding>
             </state>
@@ -125,11 +114,6 @@
               <item name="gram_api" type="b2602c69:ProjectViewProjectNode" />
               <item name="gram_api" type="462c0819:PsiDirectoryNode" />
             </path>
-            <path>
-              <item name="gram_api" type="b2602c69:ProjectViewProjectNode" />
-              <item name="gram_api" type="462c0819:PsiDirectoryNode" />
-              <item name="routes" type="462c0819:PsiDirectoryNode" />
-            </path>
           </expand>
           <select />
         </subPane>
@@ -169,18 +153,19 @@
       <updated>1563982288743</updated>
       <workItem from="1563982290487" duration="17999000" />
       <workItem from="1564068296812" duration="3927000" />
-      <workItem from="1564149474465" duration="31120000" />
+      <workItem from="1564149474465" duration="31423000" />
+      <workItem from="1564232841515" duration="675000" />
     </task>
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="53046000" />
+    <option name="totallyTimeSpent" value="54024000" />
   </component>
   <component name="ToolWindowManager">
     <frame x="-8" y="-8" width="2576" height="1056" extended-state="6" />
     <editor active="true" />
     <layout>
-      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.115445234" />
+      <window_info active="true" content_ui="combo" id="Project" order="0" visible="true" weight="0.115445234" />
       <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
       <window_info id="npm" order="2" side_tool="true" />
       <window_info id="Favorites" order="3" side_tool="true" />
@@ -194,7 +179,7 @@
       <window_info anchor="bottom" id="Docker" order="7" show_stripe_button="false" />
       <window_info anchor="bottom" id="Version Control" order="8" />
       <window_info anchor="bottom" id="Event Log" order="9" side_tool="true" />
-      <window_info active="true" anchor="bottom" id="Terminal" order="10" visible="true" weight="0.2654388" />
+      <window_info anchor="bottom" id="Terminal" order="10" visible="true" weight="0.2654388" />
       <window_info anchor="right" id="Commander" internal_type="SLIDING" order="0" type="SLIDING" weight="0.4" />
       <window_info anchor="right" id="Ant Build" order="1" weight="0.25" />
       <window_info anchor="right" content_ui="combo" id="Hierarchy" order="2" weight="0.25" />
@@ -204,13 +189,6 @@
     <option name="version" value="1" />
   </component>
   <component name="editorHistoryManager">
-    <entry file="file://$PROJECT_DIR$/package.json">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="51">
-          <caret line="3" column="17" selection-start-line="3" selection-start-column="17" selection-end-line="3" selection-end-column="17" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/node_modules/express/lib/router/index.js">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="217">
@@ -232,16 +210,10 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/routes/order.js">
+    <entry file="file://$PROJECT_DIR$/package.json">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-187">
-          <caret line="7" selection-start-line="7" selection-end-line="7" selection-end-column="128" />
-          <folding>
-            <element signature="n#!!block;n#checkIfFieldsAreEmpty#0" />
-            <element signature="n#!!block;n#checkIfFieldsAreUndefined#0" />
-            <element signature="e#805#1347#0" />
-            <element signature="n#!!block;n#getConnection#0" />
-          </folding>
+        <state relative-caret-position="51">
+          <caret line="3" column="17" selection-start-line="3" selection-start-column="17" selection-end-line="3" selection-end-column="17" />
         </state>
       </provider>
     </entry>
@@ -256,22 +228,29 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/routes/order.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="119">
+          <caret line="7" selection-start-line="7" selection-end-line="7" selection-end-column="128" />
+          <folding>
+            <element signature="n#!!block;n#checkIfFieldsAreEmpty#0" />
+            <element signature="n#!!block;n#checkIfFieldsAreUndefined#0" />
+            <element signature="n#!!block;n#getConnection#0" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/routes/user.js">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="227">
-          <caret line="204" column="5" selection-start-line="204" selection-start-column="5" selection-end-line="204" selection-end-column="5" />
+        <state relative-caret-position="443">
+          <caret line="207" column="47" selection-start-line="207" selection-start-column="47" selection-end-line="207" selection-end-column="47" />
           <folding>
-            <element signature="e#734#842#0" />
-            <element signature="e#883#1091#0" />
             <element signature="n#!!block;n#saltHashPassword#0" />
-            <element signature="n#!!block;n#checkhashPassword#0" />
             <element signature="n#!!block;n#convertToInternationalFormat#0" />
-            <element signature="n#!!block;n#checkValidityOfUserDetails#0" />
-            <element signature="n#!!block;n#checkUserInput#0" />
-            <element signature="n#!!block;n#checkIfFieldsAreEmptyOrUndefined#1" />
-            <element signature="e#1888#2234#0" />
-            <element signature="e#2622#4570#0" />
-            <element signature="e#9713#12120#0" />
+            <element signature="e#2735#3073#0" />
+            <element signature="e#3126#6484#0" />
+            <element signature="e#6535#8918#0" />
+            <element signature="e#8969#12986#0" />
             <element signature="n#!!block;n#getConnection#0" />
           </folding>
         </state>
