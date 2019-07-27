@@ -13,7 +13,7 @@ const querySelectUser = 'SELECT * FROM user where email_address=?';
 const queryUpdateUserToken = 'UPDATE user SET last_connection_datetime = NOW(), connection_token = ? WHERE email_address =?';
 const queryInsertUser = 'INSERT INTO user (email_address, name, first_name, password, phone_number, postal_address, register_datetime, salt, last_connection_datetime, connection_token) VALUES (?,?,?,?,?,?, NOW(), ?, NOW(), ?)';
 const queryUpdateUser = 'UPDATE user SET email_address = ? , name = ? , first_name = ?, password = ?, phone_number = ?, postal_address = ?, salt = ? WHERE id = ?';
-const querySelectTokenAndIdFromUser = 'SELECT id, connection_token FROM user where email_address=?';
+
 
 
 let genRandomString = function(length){

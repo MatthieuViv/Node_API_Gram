@@ -5,8 +5,8 @@ const HttpStatus = require('http-status-codes');
 const CATEGORY_TABLE = "category";
 const headerUserToken = 'usertoken';
 const queryCheckIfTokenExists = 'SELECT connection_token from user where connection_token = ?';
-const queryGetCategories = 'SELECT * FROM ' + CATEGORY_TABLE;
-const queryGetOneCategory = "SELECT * FROM " + CATEGORY_TABLE +" WHERE "+CATEGORY_TABLE+".id = ?";
+const querySelectAllCategories = 'SELECT * FROM ' + CATEGORY_TABLE;
+const querySelectCategory = "SELECT * FROM " + CATEGORY_TABLE +" WHERE "+CATEGORY_TABLE+".id = ?";
 
 const router = express.Router();
 let connection = getConnection();
@@ -20,7 +20,7 @@ router.get('/category', (req, res) => {
             });
             if (result !== undefined){
                 console.log('result[0] is undefined')
-                connection.query(queryGetCategories, (err, rows, fields) => {
+                connection.query(querySelectAllCategories, (err, rows, fields) => {
                     if (err) {
                         console.log(err);
                         res.status(HttpStatus.INTERNAL_SERVER_ERROR).send("Internal Server Error");
@@ -50,7 +50,7 @@ router.get('/category/:categoryId', (req, res) => {
                 console.log('[MySQL Error]');
             });
             if (result.length >0 ){
-                connection.query(queryGetOneCategory, [req.params.categoryId], (err, result, fields) => {
+                connection.query(querySelectCategory, [req.params.categoryId], (err, result, fields) => {
                     if (err) {
                         res.status(HttpStatus.INTERNAL_SERVER_ERROR).send("Internal server Error");
                         console.log(err);
