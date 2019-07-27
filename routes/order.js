@@ -6,8 +6,9 @@ const ORDERS_TABLE = "orders";
 const ORDERS_RECIPE_TABLE = "orders_recipe";
 
 const queryCheckIfTokenExistsAndCorrespondsToUser = 'SELECT id, connection_token from user where connection_token = ? AND id=?';
-let queryAllOrdersFromUser = "SELECT * FROM "+ ORDERS_TABLE +" WHERE "+ORDERS_TABLE+".user_id = ?";
-let queryInsertOrder = "INSERT INTO "+ ORDERS_TABLE +"(order_datetime, delivery_datetime, user_id, price, status_id) VALUES (NOW(), NOW(), ?, ?, '1')";
+const queryAllOrdersFromUser = "SELECT * FROM "+ ORDERS_TABLE +" WHERE "+ORDERS_TABLE+".user_id = ?";
+const querySelectOrder = "SELECT * FROM "+ORDERS_TABLE+" WHERE "+ORDERS_TABLE+".id = ? AND "+ORDERS_TABLE+".user_id = ?";
+const queryInsertOrder = "INSERT INTO "+ ORDERS_TABLE +"(order_datetime, delivery_datetime, user_id, price, status_id) VALUES (NOW(), NOW(), ?, ?, '1')";
 
 function checkIfFieldsAreEmpty(... allFields){
     console.log('checkUserInput : ' +allFields);
@@ -35,22 +36,87 @@ function checkIfFieldsAreUndefined(... allFields){
 const router = express.Router();
 let connection = getConnection();
 
-router.get('/orders/users/:userId', (req, res) => {
+router.get('/orders/user/:userId', (req, res) => {
 
-    if(req.headers[headerUserToken] !== undefined){
-        connection.query(queryAllOrdersFromUser, [req.params.userId], (err, rows, fields) => {
-            if (err) {
-                console.log(err);
-                res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Internal server Error');
-            } else {
-                console.log('Query done');
-                res.status(HttpStatus.OK).send(rows);
+    let post_data = req.body;
+    let inputUserId = post_data.inputUserId;
+    inputUserId = req.params.userId;
+
+    console.log(req.params.userId);
+    if (checkIfFieldsAreUndefined(inputUserId)) {
+        if (checkIfFieldsAreEmpty(inputUserId)) {
+            if (req.headers[headerUserToken] !== undefined) {
+                connection.query(queryCheckIfTokenExistsAndCorrespondsToUser, [req.headers[headerUserToken], inputUserId], function (err, result, fields) {
+                    connection.on('error', function(err) {
+                        console.log('[MySQL Error]')
+                    });
+                    if (result && result.length > 0) {
+                        connection.query(queryAllOrdersFromUser, [inputUserId], (err, result, fields) => {
+                            if(err){
+                                console.log('[MySQL Error]' +err);
+                                res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Internal server Error');
+                            } else if (result && result.length > 0){
+                                console.log('Result : '+JSON.stringify(result));
+                                res.status(HttpStatus.OK).send(JSON.stringify(result));
+                            } else
+                                res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Internal server Error');
+                        });
+                    } else {
+                        res.status(HttpStatus.BAD_REQUEST).send('Token and userId do not match');
+                    }
+                });
+            }else {
+                res.status(HttpStatus.UNAUTHORIZED).send('Authentication Required');
             }
-        });
+        } else {
+            res.status(HttpStatus.BAD_REQUEST).send('At least one input is empty');
+        }
     } else {
-        res.status(HttpStatus.UNAUTHORIZED).send('Authentication Required');
+        res.status(HttpStatus.BAD_REQUEST).send('At least one input is not defined')
     }
 
+});
+
+router.get('/orders/:orderId', (req, res) => {
+
+    let post_data = req.body;
+    let inputUserId = post_data.inputUserId;
+    inputOrderId = req.params.orderId;
+
+    console.log(inputOrderId);
+    console.log(inputUserId);
+
+    if (checkIfFieldsAreUndefined(inputUserId, inputOrderId)) {
+        if (checkIfFieldsAreEmpty(inputUserId, inputOrderId)) {
+            if (req.headers[headerUserToken] !== undefined) {
+                connection.query(queryCheckIfTokenExistsAndCorrespondsToUser, [req.headers[headerUserToken], inputUserId], function (err, result, fields) {
+                    connection.on('error', function(err) {
+                        console.log('[MySQL Error] : '+err)
+                    });
+                    if (result && result.length > 0) {
+                        connection.query(querySelectOrder, [inputOrderId, inputUserId], (err, result, fields) => {
+                            if(err){
+                                console.log('[MySQL Error] : '+err);
+                                res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Internal server Error');
+                            } else if (result && result.length > 0){
+                                console.log('Result : '+JSON.stringify(result));
+                                res.status(HttpStatus.OK).send(JSON.stringify(result));
+                            } else
+                                res.status(HttpStatus.BAD_REQUEST).send('userId and orderId do not match');
+                        });
+                    } else {
+                        res.status(HttpStatus.BAD_REQUEST).send('Token and userId do not match');
+                    }
+                });
+            }else {
+                res.status(HttpStatus.UNAUTHORIZED).send('Authentication Required');
+            }
+        } else {
+            res.status(HttpStatus.BAD_REQUEST).send('At least one input is empty');
+        }
+    } else {
+        res.status(HttpStatus.BAD_REQUEST).send('At least one input is not defined')
+    }
 
 });
 
@@ -62,7 +128,6 @@ router.post('/orders/users/', (req, res) => {
 
     if (checkIfFieldsAreUndefined(inputUserId, inputOrderPrice)) {
         if(checkIfFieldsAreEmpty(inputUserId, inputOrderPrice)){
-            console.log('fields are ok')
             if(req.headers[headerUserToken] !== undefined){
                 connection.query(queryCheckIfTokenExistsAndCorrespondsToUser, [req.headers[headerUserToken], inputUserId], function (err, result, fields) {
                     connection.on('error', function(err) {
@@ -73,7 +138,8 @@ router.post('/orders/users/', (req, res) => {
                     console.log('Fields : '+fields);
                     console.log('Fields Json.stringify : '+JSON.stringify(fields));
 
-                    if (result && result.length > 0) {connection.query(queryInsertOrder, [inputUserId, inputOrderPrice], (err, result, fields) => {
+                    if (result && result.length > 0) {
+                        connection.query(queryInsertOrder, [inputUserId, inputOrderPrice], (err, result, fields) => {
                         if(err){
                             console.log('[MySQL Error]' +err);
                             res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Internal server Error');

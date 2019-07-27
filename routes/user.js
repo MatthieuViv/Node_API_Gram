@@ -7,6 +7,7 @@ const libPhoneNumber = require('libphonenumber-js');
 const HttpStatus = require('http-status-codes');
 
 const headerUserToken = 'usertoken';
+const querySelectAllUsers ="SELECT FROM user";
 const queryCheckIfTokenExistsAndCorrespondsToUser = 'SELECT id, connection_token from user where connection_token = ? AND id=?';
 const querySelectUser = 'SELECT * FROM user where email_address=?';
 const queryUpdateUserToken = 'UPDATE user SET last_connection_datetime = NOW(), connection_token = ? WHERE email_address =?';
@@ -76,21 +77,6 @@ function checkIfFieldsAreUndefined(... allFields){
 }
 
 const router = express.Router();
-
-router.get('/users', (req, res) => {
-    const connection = getConnection();
-    let queryString = "SELECT * FROM user";
-    connection.query(queryString, (err, rows, fields) => {
-        if (err) {
-            res.sendStatus(500);
-            console.log(err);
-        }
-        else {
-            console.log('Query done');
-            res.json(rows);
-        }
-    });
-});
 
 router.post('/users/register',(req, res, next)=> {
 

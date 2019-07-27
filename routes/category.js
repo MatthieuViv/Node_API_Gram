@@ -5,13 +5,11 @@ const HttpStatus = require('http-status-codes');
 const CATEGORY_TABLE = "category";
 const headerUserToken = 'usertoken';
 const queryCheckIfTokenExists = 'SELECT connection_token from user where connection_token = ?';
-const queryGetCategories = 'SELECT * FROM '+CATEGORY_TABLE;
-const queryGetOneCategory = "SELECT * FROM "+ CATEGORY_TABLE +" WHERE "+CATEGORY_TABLE+".id = ?";
-
+const queryGetCategories = 'SELECT * FROM ' + CATEGORY_TABLE;
+const queryGetOneCategory = "SELECT * FROM " + CATEGORY_TABLE +" WHERE "+CATEGORY_TABLE+".id = ?";
 
 const router = express.Router();
 let connection = getConnection();
-
 
 router.get('/category', (req, res) => {
 
