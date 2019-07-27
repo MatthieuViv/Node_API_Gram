@@ -9,9 +9,10 @@ const HttpStatus = require('http-status-codes');
 const headerUserToken = 'usertoken';
 const queryCheckIfTokenExistsAndCorrespondsToUser = 'SELECT id, connection_token from user where connection_token = ? AND id=?';
 const querySelectUser = 'SELECT * FROM user where email_address=?';
+const queryUpdateUserToken = 'UPDATE user SET last_connection_datetime = NOW(), connection_token = ? WHERE email_address =?';
 const queryInsertUser = 'INSERT INTO user (email_address, name, first_name, password, phone_number, postal_address, register_datetime, salt, last_connection_datetime, connection_token) VALUES (?,?,?,?,?,?, NOW(), ?, NOW(), ?)';
 const queryUpdateUser = 'UPDATE user SET email_address = ? , name = ? , first_name = ?, password = ?, phone_number = ?, postal_address = ?, salt = ? WHERE id = ?';
-const querySelectTokenFromUser = 'SELECT connection_token FROM user where email_address=?';
+const querySelectTokenAndIdFromUser = 'SELECT id, connection_token FROM user where email_address=?';
 
 
 let genRandomString = function(length){
@@ -175,28 +176,32 @@ router.post('/users/login', (req, res, next)=> {
                 let hashed_password = checkHashPassword(inputPassword, salt).passwordHash;
                 let newToken = uuid.v4();
                 if (encrypted_password === hashed_password) {
-                    connection.query(queryUpdateUser, [newToken, inputEmail], function (err, result, fields) {
+                    connection.query(queryUpdateUserToken, [newToken, inputEmail], function (err, result, fields) {
                         connection.on('error', function (err) {
-                           console.log('[MySQL ERROR]', err);
+                            console.log('[MySQL ERROR]', err);
+                            //res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Internal Server Error');
                         });
                         if (typeof result !== typeof undefined){
-                            connection.query(querySelectTokenFromUser, [inputEmail], function (err, result, fields) {
+                            connection.query(querySelectUser, [inputEmail], function (err, result, fields) {
                                 connection.on('error', function (err) {
                                     console.log('[MySQL ERROR]', err);
                                 });
-                                if (typeof result[0] !== typeof undefined){
-                                    res.status(HttpStatus.OK).send(JSON.stringify(result[0])); //Send the token back to the user
+                                if (result && result.length >0){
+                                    res.status(HttpStatus.OK).send(JSON.stringify(result[0])); //Send the token and ID back to the user
+                                } else {
+                                    console.log('Internal server error');
+                                    res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Internal Server Error');
                                 }
                             });
+                        } else {
+                            console.log('Internal server error');
+                            res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Internal Server Error');
                         }
-                        console.log('User last_connection updated');
-                        // res.end(JSON.stringify(result[0])) //If password is true, return all info of user
                     });
                 } else
                     res.end(JSON.stringify('Wrong password'))
             }
             else {
-                console.log('User does not exist');
                 res.status(HttpStatus.BAD_REQUEST).json('User does not exist');
             }
         });
@@ -236,22 +241,6 @@ router.post('/users/update',(req, res, next)=> {
                             console.log('[MySQL ERROR]: ', err);
                         });
                         if (result && result.length > 0){
-                            //TODO: ce code fonctionne avec la librairie mysql-utilities, checker si ca vaut le coup
-                            /*connection.update(
-                                'user',
-                                { email_address: inputEmail,
-                                  password: userPassword,
-                                  salt: salt,
-                                  name: inputName,
-                                  first_name: inputFirstName,
-                                  phone_number: inputPhoneNumber,
-                                  postal_address: inputPostalAddress,
-                                },
-                                { id: inputUserId },
-                                (err, affectedRows) => {
-                                    console.dir({ update: affectedRows });
-                                }
-                            );*/
                             connection.query(queryUpdateUser, [inputEmail, inputName, inputFirstName, userPassword, inputPhoneNumber, inputPostalAddress, salt, inputUserId], (err, result, fields) => {
                                 connection.on('error', function (err) {
                                     console.log('[MySQL ERROR]', err);
@@ -280,7 +269,6 @@ router.post('/users/update',(req, res, next)=> {
 
 
 });
-
 
 function getConnection() {
     return connection = mysql.createConnection({
