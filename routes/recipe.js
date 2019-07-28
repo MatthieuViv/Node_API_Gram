@@ -113,17 +113,37 @@ router.get('/recipes/category/:categoryId', (req, res) => {
     }
 });
 
-router.get('/recipes/user/liked/:userId', (req, res) => {
-    connection.query(SelectUserLikedRecipes, [req.params.userId], function (err, result, fields) {
-        connection.on('error', function (err){
-            console.log('[MySQL ERROR] : '+ err);
+router.get('/recipes/user/like/:userId', (req, res) => {
+
+    if(req.headers[headerUserToken] !== undefined) {
+        connection.query(queryCheckIfTokenExistsAndCorrespondsToUser, [req.headers[headerUserToken], req.params.userId], function (err, result, fields) {
+            connection.on('error', function (err) {
+                console.log('[MySQL Error]' +err);
+                res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Internal server Error');
+            });
+            if (result && result.length > 0) {
+                connection.query(SelectUserLikedRecipes, [req.params.userId], function (err, result, fields) {
+                    connection.on('error', function (err){
+                        console.log('[MySQL ERROR] : '+ err);
+                        res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Internal server Error');
+                    });
+                    if (result && result.length > 0){
+                        res.status(HttpStatus.OK).send(JSON.stringify(result));
+                    } else {
+                        res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Problem with the query');
+                    }
+                });
+            } else {
+                res.status(HttpStatus.BAD_REQUEST).send('Token and userId do not match');
+            }
         });
-        if (result && result.length > 0){
-            res.status(HttpStatus.OK).send(JSON.stringify(result));
-        } else {
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Problem with the query');
-        }
-    })
+    } else {
+        res.status(HttpStatus.UNAUTHORIZED).send('Authentication Required');
+    }
+
+
+
+
 });
 
 router.post('/recipes/user/like/:userId', (req, res) => {
@@ -201,7 +221,7 @@ router.post('/recipes/user/like/:userId', (req, res) => {
     }
 });
 
-router.get('/recipes/user/disliked/:userId', (req, res) => {
+router.get('/recipes/user/dislike/:userId', (req, res) => {
 });
 
 router.post('/recipes/user/dislike/:userId', (req, res) => {
