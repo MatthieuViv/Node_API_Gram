@@ -3,9 +3,10 @@ const mysql = require('mysql');
 const HttpStatus = require('http-status-codes');
 const headerUserToken = 'usertoken';
 
-const SelectInstructionFromRecipe = "SELECT * from instruction where instruction.recipe_id = ? ";
+const SelectIngredientsFromRecipe = "SELECT id, name, quantity from ingredient INNER JOIN recipe_ingredient ON ingredient.id = recipe_ingredient.ingredient_id where recipe_ingredient.recipe_id = ? ";
 const SelectRecipe = "SELECT * from recipe where id = ? ";
 const queryCheckIfTokenExistsAndCorrespondsToUser = 'SELECT id, connection_token from user where connection_token = ? AND id=?';
+
 
 const router = express.Router();
 let connection = getConnection();
@@ -42,12 +43,11 @@ function checkIfFieldsAreUndefined(... allFields){
     return true;
 }
 
-router.get('/instructions/:recipeId', (req, res) => {
+router.get('/ingredients/:recipeId', (req, res) => {
 
     let post_data = req.body;
     let inputUserId = post_data.inputUserId;
     let inputRecipeId = req.params.recipeId;
-
 
     if (checkIfFieldsAreUndefined(inputUserId, inputRecipeId)) {
         if (checkIfFieldsAreEmpty(inputUserId, inputRecipeId)) {
@@ -59,13 +59,13 @@ router.get('/instructions/:recipeId', (req, res) => {
                     if (result && result.length > 0) {
                         connection.query(SelectRecipe, [inputRecipeId], (err, result, fields) => {
                             connection.on('error', function (err) {
-                                console.log('[MySQL Error] : ' + err)
+                                console.log('[MySQL Error] : ' + err);
                             });
                             if (err) {
                                 console.log('[MySQL Error] : ' + err);
                                 res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Internal server Error');
                             } else if (result && result.length > 0) {
-                                connection.query(SelectInstructionFromRecipe, [inputRecipeId], (err, result, fields) => {
+                                connection.query(SelectIngredientsFromRecipe, [inputRecipeId], (err, result, fields) => {
                                     if (err) {
                                         console.log('[MySQL Error] : ' + err);
                                         res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Internal server Error');
@@ -73,18 +73,19 @@ router.get('/instructions/:recipeId', (req, res) => {
                                         console.log('Result : ' + JSON.stringify(result));
                                         res.status(HttpStatus.OK).send(JSON.stringify(result));
                                     } else {
-                                        res.status(HttpStatus.BAD_REQUEST).send('This Recipe does not have any instruction');
+                                        res.status(HttpStatus.BAD_REQUEST).send('This recipe does not have any ingredient');
                                     }
-                            });
+                                });
                             } else {
-                                res.status(HttpStatus.BAD_REQUEST).send('RecipeId does not match any recipe');
+                                res.status(HttpStatus.BAD_REQUEST).send('Recipe id does not match any recipe');
                             }
                         });
                     } else {
                         res.status(HttpStatus.FORBIDDEN).send('Token and userId do not match');
                     }
                 });
-            } else {
+            }
+            else {
                 res.status(HttpStatus.UNAUTHORIZED).send('Authentication Required');
             }
         } else {
