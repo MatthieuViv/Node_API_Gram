@@ -10,7 +10,8 @@ const order = require('./routes/order');
 const recipe = require('./routes/recipe');
 const instruction = require('./routes/instruction');
 const utensils = require('./routes/utensil');
-const ingredients = require('./routes/ingredient');
+const ingredient = require('./routes/ingredient');
+const promotion = require('./routes/promotion');
 
 app.use(morgan('short'));
 app.use(bodyParser.json());
@@ -21,7 +22,8 @@ app.use(order);
 app.use(recipe);
 app.use(instruction);
 app.use(utensils);
-app.use(ingredients);
+app.use(ingredient);
+app.use(promotion);
 
 app.get('/', (req, res, next) => {
     console.log('THIS IS A / GET CALL');
