@@ -3,16 +3,18 @@ const mysql = require('mysql');
 const crypto = require('crypto');
 const uuid = require('uuid');
 const emailValidator = require("email-validator");
+const passwordValidator = require('password-validator');
 const libPhoneNumber = require('libphonenumber-js');
 const HttpStatus = require('http-status-codes');
 
 const headerUserToken = 'usertoken';
 const querySelectAllUsers ="SELECT FROM user";
-const queryCheckIfTokenExistsAndCorrespondsToUser = 'SELECT id, connection_token from user where connection_token = ? AND id=?';
-const querySelectUser = 'SELECT * FROM user where email_address=?';
-const queryUpdateUserToken = 'UPDATE user SET last_connection_datetime = NOW(), connection_token = ? WHERE email_address =?';
-const queryInsertUser = 'INSERT INTO user (email_address, name, first_name, password, phone_number, postal_address, register_datetime, salt, last_connection_datetime, connection_token) VALUES (?,?,?,?,?,?, NOW(), ?, NOW(), ?)';
-const queryUpdateUser = 'UPDATE user SET email_address = ? , name = ? , first_name = ?, password = ?, phone_number = ?, postal_address = ?, salt = ? WHERE id = ?';
+const CheckIfTokenExistsAndCorrespondsToUser = 'SELECT id, connection_token from user where connection_token = ? AND id=?';
+const SelectUserWithEmail = 'SELECT id, email_address, name, first_name, phone_number, postal_address FROM user where email_address=?';
+const SelectUserWithId = 'SELECT id, email_address, name, first_name, phone_number, postal_address FROM user where id=?';
+const UpdateUserToken = 'UPDATE user SET last_connection_datetime = NOW(), connection_token = ? WHERE email_address =?';
+const InsertUser = 'INSERT INTO user (email_address, name, first_name, password, phone_number, postal_address, register_datetime, salt, last_connection_datetime, connection_token) VALUES (?,?,?,?,?,?, NOW(), ?, NOW(), ?)';
+const UpdateUser = 'UPDATE user SET email_address = ? , name = ? , first_name = ?, password = ?, phone_number = ?, postal_address = ?, salt = ? WHERE id = ?';
 
 
 
@@ -52,6 +54,19 @@ function convertToInternationalFormat(phoneNumber){
 
 function checkEmailValidity(email){
     return emailValidator.validate(email);
+}
+
+function checkPassword(password){
+    let schema = new passwordValidator();
+    schema
+        .is().min(6)                                    // Minimum length 86
+        .is().max(70)                                   // Maximum length 70
+        .has().uppercase()                              // Must have uppercase letters
+        .has().lowercase()                              // Must have lowercase letters
+        .has().digits()                                 // Must have digits
+        .has().not().spaces()                           // Should not have spaces
+
+    return schema.validate(password);
 }
 
 function checkIfFieldsAreEmpty(... allFields){
@@ -101,8 +116,8 @@ router.post('/users/register',(req, res, next)=> {
             let uid = uuid.v4();
             inputPhoneNumber = convertToInternationalFormat(inputPhoneNumber);
 
-            if (checkIfFieldsAreEmpty(inputName, inputFirstName, inputEmail, inputPhoneNumber, inputPostalAddress, plaint_password) && checkEmailValidity(inputEmail)){
-                connection.query(querySelectUser, [inputEmail] , function(err, result, fields) {
+            if (checkIfFieldsAreEmpty(inputName, inputFirstName, inputEmail, inputPhoneNumber, inputPostalAddress, plaint_password) && checkEmailValidity(inputEmail) && checkPassword(plaint_password)){
+                connection.query(SelectUserWithEmail, [inputEmail] , function(err, result, fields) {
                     connection.on('error', function (err) {
                         console.log('[MySQL ERROR]: ', err);
                     });
@@ -114,18 +129,25 @@ router.post('/users/register',(req, res, next)=> {
                         res.status(HttpStatus.CONFLICT).send('User Already Exists');
                     }
                     else {
-                        connection.query(queryInsertUser, [inputEmail, inputName, inputFirstName, userPassword, inputPhoneNumber, inputPostalAddress, salt, uid], (err, result, fields) => {
+                        connection.query(InsertUser, [inputEmail, inputName, inputFirstName, userPassword, inputPhoneNumber, inputPostalAddress, salt, uid], (err, result, fields) => {
                             connection.on('error', function (err) {
                                 console.log('[MySQL ERROR', err);
                                 res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Register error: ', err);
                             });
                             if (result.insertId) {
-                                console.log('Result : '+result);
-                                console.log('Result Json.stringify : '+JSON.stringify(result));
-                                console.log('Result.insertId : '+result.insertId);
-                                console.log('Fields : '+fields);
-                                console.log('Fields Json.stringify : '+JSON.stringify(fields));
-                                res.status(HttpStatus.CREATED).send('User Created Successfully');
+                                connection.query(SelectUserWithId, [result.insertId], (err, result, fields) => {
+                                    connection.on('error', function (err) {
+                                        console.log('[MySQL ERROR', err);
+                                        res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Register error: ', err);
+                                    });
+                                    if(result && result.length > 0){
+                                        res.status(HttpStatus.CREATED).send(JSON.stringify(result[0]));
+                                    } else {
+                                        res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Register error: ', err);
+                                    }
+                                });
+                            } else {
+                                res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Register error: ', err);
                             }
                         });
                     }
@@ -150,8 +172,8 @@ router.post('/users/login', (req, res, next)=> {
     let inputPassword = post_data.inputPassword;
     let inputEmail = post_data.inputEmail;
 
-    if (checkIfFieldsAreEmpty(inputEmail, inputPassword) && checkEmailValidity(inputEmail)) {
-        connection.query(querySelectUser, [inputEmail] , function(err, result, fields) {
+    if (checkIfFieldsAreEmpty(inputEmail, inputPassword) && checkEmailValidity(inputEmail) && checkPassword(inputPassword)) {
+        connection.query(SelectUserWithEmail, [inputEmail] , function(err, result, fields) {
             connection.on('error', function (err) {
                 console.log('[MySQL ERROR]', err);
             });
@@ -162,13 +184,13 @@ router.post('/users/login', (req, res, next)=> {
                 let hashed_password = checkHashPassword(inputPassword, salt).passwordHash;
                 let newToken = uuid.v4();
                 if (encrypted_password === hashed_password) {
-                    connection.query(queryUpdateUserToken, [newToken, inputEmail], function (err, result, fields) {
+                    connection.query(UpdateUserToken, [newToken, inputEmail], function (err, result, fields) {
                         connection.on('error', function (err) {
                             console.log('[MySQL ERROR]', err);
                             //res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Internal Server Error');
                         });
                         if (typeof result !== typeof undefined){
-                            connection.query(querySelectUser, [inputEmail], function (err, result, fields) {
+                            connection.query(SelectUserWithEmail, [inputEmail], function (err, result, fields) {
                                 connection.on('error', function (err) {
                                     console.log('[MySQL ERROR]', err);
                                 });
@@ -222,12 +244,12 @@ router.post('/users/update',(req, res, next)=> {
 
                 if (checkIfFieldsAreEmpty(inputName, inputFirstName, inputEmail, inputPhoneNumber, inputPostalAddress, plaint_password, inputUserId) && checkEmailValidity(inputEmail)){
 
-                    connection.query(queryCheckIfTokenExistsAndCorrespondsToUser, [req.headers[headerUserToken], inputUserId] , function(err, result, fields) {
+                    connection.query(CheckIfTokenExistsAndCorrespondsToUser, [req.headers[headerUserToken], inputUserId] , function(err, result, fields) {
                         connection.on('error', function (err) {
                             console.log('[MySQL ERROR]: ', err);
                         });
                         if (result && result.length > 0){
-                            connection.query(queryUpdateUser, [inputEmail, inputName, inputFirstName, userPassword, inputPhoneNumber, inputPostalAddress, salt, inputUserId], (err, result, fields) => {
+                            connection.query(UpdateUser, [inputEmail, inputName, inputFirstName, userPassword, inputPhoneNumber, inputPostalAddress, salt, inputUserId], (err, result, fields) => {
                                 connection.on('error', function (err) {
                                     console.log('[MySQL ERROR]', err);
                                     res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Register error: ', err);
