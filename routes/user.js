@@ -8,9 +8,9 @@ const libPhoneNumber = require('libphonenumber-js');
 const HttpStatus = require('http-status-codes');
 
 const headerUserToken = 'usertoken';
-const querySelectAllUsers ="SELECT FROM user";
 const CheckIfTokenExistsAndCorrespondsToUser = 'SELECT id, connection_token from user where connection_token = ? AND id=?';
-const SelectUserWithEmail = 'SELECT id, email_address, name, first_name, phone_number, postal_address FROM user where email_address=?';
+const SelectUserSafely = 'SELECT id, email_address, name, first_name, phone_number, postal_address, connection_token FROM user where email_address=?';
+const SelectUserWithEmail = 'SELECT id, email_address, name, first_name, phone_number, postal_address, salt, password FROM user where email_address=?';
 const SelectUserWithId = 'SELECT id, email_address, name, first_name, phone_number, postal_address FROM user where id=?';
 const UpdateUserToken = 'UPDATE user SET last_connection_datetime = NOW(), connection_token = ? WHERE email_address =?';
 const InsertUser = 'INSERT INTO user (email_address, name, first_name, password, phone_number, postal_address, register_datetime, salt, last_connection_datetime, connection_token) VALUES (?,?,?,?,?,?, NOW(), ?, NOW(), ?)';
@@ -165,7 +165,7 @@ router.post('/users/register',(req, res, next)=> {
 
 router.post('/users/login', (req, res, next)=> {
 
-    console.log('users/login: ');
+    console.log('Route : users/login: ');
     const  connection = getConnection();
 
     let post_data = req.body;
@@ -181,7 +181,9 @@ router.post('/users/login', (req, res, next)=> {
             if (result && result.length ){
                 let salt = result[0].salt;
                 let encrypted_password = result[0].password;
+                console.log('Encrypted password : ' +encrypted_password);
                 let hashed_password = checkHashPassword(inputPassword, salt).passwordHash;
+                console.log('hashed password : ' +hashed_password);
                 let newToken = uuid.v4();
                 if (encrypted_password === hashed_password) {
                     connection.query(UpdateUserToken, [newToken, inputEmail], function (err, result, fields) {
@@ -190,12 +192,13 @@ router.post('/users/login', (req, res, next)=> {
                             //res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Internal Server Error');
                         });
                         if (typeof result !== typeof undefined){
-                            connection.query(SelectUserWithEmail, [inputEmail], function (err, result, fields) {
+                            connection.query(SelectUserSafely, [inputEmail], function (err, result, fields) {
                                 connection.on('error', function (err) {
                                     console.log('[MySQL ERROR]', err);
                                 });
                                 if (result && result.length >0){
-                                    res.status(HttpStatus.OK).send(JSON.stringify(result[0])); //Send the token and ID back to the user
+                                    console.log(JSON.stringify(result[0].connection_token))
+                                    res.status(HttpStatus.OK).send(JSON.stringify(result[0].connection_token)); //Send the token and ID back to the user
                                 } else {
                                     console.log('Internal server error');
                                     res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Internal Server Error');
