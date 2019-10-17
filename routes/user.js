@@ -11,7 +11,7 @@ const headerUserToken = 'usertoken';
 const CheckIfTokenExistsAndCorrespondsToUser = 'SELECT id, connection_token from user where connection_token = ? AND id=?';
 const SelectUserSafely = 'SELECT id, email_address, name, first_name, phone_number, postal_address, connection_token FROM user where email_address=?';
 const SelectUserWithEmail = 'SELECT id, email_address, name, first_name, phone_number, postal_address, salt, password FROM user where email_address=?';
-const SelectUserWithId = 'SELECT id, email_address, name, first_name, phone_number, postal_address FROM user where id=?';
+const SelectUserWithId = 'SELECT id, email_address, name, first_name, phone_number, postal_address, connection_token FROM user where id=?';
 const UpdateUserToken = 'UPDATE user SET last_connection_datetime = NOW(), connection_token = ? WHERE email_address =?';
 const InsertUser = 'INSERT INTO user (email_address, name, first_name, password, phone_number, postal_address, register_datetime, salt, last_connection_datetime, connection_token) VALUES (?,?,?,?,?,?, NOW(), ?, NOW(), ?)';
 const UpdateUser = 'UPDATE user SET email_address = ? , name = ? , first_name = ?, password = ?, phone_number = ?, postal_address = ?, salt = ? WHERE id = ?';
@@ -108,8 +108,10 @@ router.post('/users/register',(req, res, next)=> {
     let inputPostalAddress = post_data.inputPostalAddress;
 
     if (checkIfFieldsAreUndefined(inputEmail, plaint_password, inputName, inputFirstName, inputPhoneNumber, inputPostalAddress)) {
+        console.log('Inside checkIfFieldsAreUndefined()');
 
         if(checkIfFieldsAreEmpty(inputEmail, plaint_password, inputName, inputFirstName, inputPhoneNumber, inputPostalAddress)){
+            console.log('Inside checkIfFieldsAreEmpty()');
             let hash_data = saltHashPassword(plaint_password);
             let userPassword = hash_data.passwordHash;
             let salt = hash_data.salt;
@@ -117,15 +119,16 @@ router.post('/users/register',(req, res, next)=> {
             inputPhoneNumber = convertToInternationalFormat(inputPhoneNumber);
 
             if (checkIfFieldsAreEmpty(inputName, inputFirstName, inputEmail, inputPhoneNumber, inputPostalAddress, plaint_password) && checkEmailValidity(inputEmail) && checkPassword(plaint_password)){
+
                 connection.query(SelectUserWithEmail, [inputEmail] , function(err, result, fields) {
                     connection.on('error', function (err) {
                         console.log('[MySQL ERROR]: ', err);
                     });
                     if (result && result.length ){
-                        console.log('Result : '+result);
+                       /* console.log('Result : '+result);
                         console.log('Result Json.stringify : '+JSON.stringify(result));
                         console.log('Fields : '+fields);
-                        console.log('Fields Json.stringify : '+JSON.stringify(fields));
+                        console.log('Fields Json.stringify : '+JSON.stringify(fields));*/
                         res.status(HttpStatus.CONFLICT).send('User Already Exists');
                     }
                     else {
@@ -141,6 +144,7 @@ router.post('/users/register',(req, res, next)=> {
                                         res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Register error: ', err);
                                     });
                                     if(result && result.length > 0){
+                                        console.log('Result : '+JSON.stringify(result[0]))
                                         res.status(HttpStatus.CREATED).send(JSON.stringify(result[0]));
                                     } else {
                                         res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Register error: ', err);
