@@ -2,14 +2,19 @@ const express = require('express');
 const mysql = require('mysql');
 const HttpStatus = require('http-status-codes');
 
+
 const CATEGORY_TABLE = "category";
 const headerUserToken = 'usertoken';
+
 const queryCheckIfTokenExists = 'SELECT connection_token from user where connection_token = ?';
 const querySelectAllCategories = 'SELECT * FROM ' + CATEGORY_TABLE;
 const querySelectCategory = "SELECT * FROM " + CATEGORY_TABLE +" WHERE "+CATEGORY_TABLE+".id = ?";
 
 const router = express.Router();
+import {getConnection} from '../Utils/Helper';
 let connection = getConnection();
+
+
 
 router.get('/category', (req, res) => {
 
@@ -78,6 +83,7 @@ router.get('/category/:categoryId', (req, res) => {
 
 });
 
+/*
 function getConnection() {
     let connection = mysql.createConnection({
         host     : 'localhost',
@@ -87,5 +93,7 @@ function getConnection() {
     });
     return connection;
 }
+*/
+
 
 module.exports = router;

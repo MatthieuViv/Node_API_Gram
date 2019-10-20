@@ -10,17 +10,18 @@ const queryCheckIfTokenExistsAndCorrespondsToUser = 'SELECT id, connection_token
 
 
 const router = express.Router();
-let connection = getConnection();
+import {getConnection} from "../Utils/Helper";
+import {PROMOTIONS_QUERIES , USER_QUERIES} from "../Utils/Queries";
 
-function getConnection() {
-    let connection = mysql.createConnection({
-        host     : 'localhost',
-        user: 'root',
-        password : 'password',
-        database : 'gram'
-    });
-    return connection;
-}
+// function getConnection() {
+//     let connection = mysql.createConnection({
+//         host     : 'localhost',
+//         user: 'root',
+//         password : 'password',
+//         database : 'gram'
+//     });
+//     return connection;
+// }
 
 function checkIfFieldsAreEmpty(... allFields){
     console.log('checkUserInput : ' +allFields);
@@ -52,7 +53,7 @@ router.get('/promotions/', (req, res) => {
     if (checkIfFieldsAreUndefined(inputUserId)) {
         if (checkIfFieldsAreEmpty(inputUserId)) {
             if (req.headers[headerUserToken] !== undefined) {
-                connection.query(queryCheckIfTokenExistsAndCorrespondsToUser, [req.headers[headerUserToken], inputUserId], function (err, result, fields) {
+                connection.query(USER_QUERIES.checkIfTokenExistsAndCorrespondsToUser, [req.headers[headerUserToken], inputUserId], function (err, result, fields) {
                     connection.on('error', function (err) {
                         console.log('[MySQL Error] : ' + err)
                     });

@@ -1,5 +1,5 @@
 const express = require('express');
-const mysql = require('mysql');
+
 const crypto = require('crypto');
 const uuid = require('uuid');
 const emailValidator = require("email-validator");
@@ -16,7 +16,9 @@ const UpdateUserToken = 'UPDATE user SET last_connection_datetime = NOW(), conne
 const InsertUser = 'INSERT INTO user (email_address, name, first_name, password, phone_number, postal_address, register_datetime, salt, last_connection_datetime, connection_token) VALUES (?,?,?,?,?,?, NOW(), ?, NOW(), ?)';
 const UpdateUser = 'UPDATE user SET email_address = ? , name = ? , first_name = ?, password = ?, phone_number = ?, postal_address = ?, salt = ? WHERE id = ?';
 
+import {USER_QUERIES} from "../Utils/Queries";
 
+import {getConnection} from '../Utils/Helper';
 
 let genRandomString = function(length){
     return crypto.randomBytes(Math.ceil(length/2))
@@ -284,14 +286,5 @@ router.post('/users/update',(req, res, next)=> {
 
 
 });
-
-function getConnection() {
-    return connection = mysql.createConnection({
-        host     : 'localhost',
-        user: 'root',
-        password : 'password',
-        database : 'gram'
-    });
-}
 
 module.exports = router;
