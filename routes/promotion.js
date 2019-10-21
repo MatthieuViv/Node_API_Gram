@@ -1,88 +1,75 @@
 const express = require('express');
-const mysql = require('mysql');
 const HttpStatus = require('http-status-codes');
-const headerUserToken = 'usertoken';
 
-
-const SelectRecipe = "SELECT * from recipe where id = ? ";
-const SelectAllPromotions = "SELECT * from promotion";
-const queryCheckIfTokenExistsAndCorrespondsToUser = 'SELECT id, connection_token from user where connection_token = ? AND id=?';
-
+const PromotionType = Object.freeze({ "CATEGORY": "CATEGORY", "RECIPE": "RECIPE" });
 
 const router = express.Router();
-import {getConnection} from "../Utils/Helper";
-import {PROMOTIONS_QUERIES , USER_QUERIES} from "../Utils/Queries";
+import {getConnection} from "../helpers/utils";
+import {PROMOTIONS_QUERIES} from "../helpers/queries";
 
-// function getConnection() {
-//     let connection = mysql.createConnection({
-//         host     : 'localhost',
-//         user: 'root',
-//         password : 'password',
-//         database : 'gram'
-//     });
-//     return connection;
-// }
-
-function checkIfFieldsAreEmpty(... allFields){
-    console.log('checkUserInput : ' +allFields);
-    for (field  of allFields) {
-        if (field.toString().trim().length === 0){
-            console.log(field);
-            return false
+//      PUBLIC ROUTES
+router.get('/promotions', (req, res) => {
+    getConnection.query(PROMOTIONS_QUERIES.selectAllAdmin, (err, result, fields) => {
+        if (err) {
+            console.error('[MySQL Error] : ' + err);
+            res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Internal server Error');
+        } else {
+            res.status(HttpStatus.OK).send(result);
         }
+    });
+});
+
+router.get('/promotions/types', (req, res) => {
+    let types = [];
+    for (var key in PromotionType) {
+        types.push(PromotionType[key]);
     }
-    return true;
-}
+    res.status(HttpStatus.OK).send(types);
+});
 
-function checkIfFieldsAreUndefined(... allFields){
-    console.log('checkUserInput : ' +allFields);
-    for (field  of allFields) {
-        if (typeof field === typeof undefined){
-            console.log(field);
-            return false
-        }
-    }
-    return true;
-}
-
-router.get('/promotions/', (req, res) => {
-
-    let post_data = req.body;
-    let inputUserId = post_data.inputUserId;
-
-    if (checkIfFieldsAreUndefined(inputUserId)) {
-        if (checkIfFieldsAreEmpty(inputUserId)) {
-            if (req.headers[headerUserToken] !== undefined) {
-                connection.query(USER_QUERIES.checkIfTokenExistsAndCorrespondsToUser, [req.headers[headerUserToken], inputUserId], function (err, result, fields) {
-                    connection.on('error', function (err) {
-                        console.log('[MySQL Error] : ' + err)
-                    });
-                    if (result && result.length > 0) {
-                        connection.query(SelectAllPromotions,  (err, result, fields) => {
-                            if (err) {
-                                console.log('[MySQL Error] : ' + err);
-                                res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Internal server Error');
-                            } else if (result && result.length > 0) {
-                                console.log('Result : ' + JSON.stringify(result));
-                                res.status(HttpStatus.OK).send(JSON.stringify(result));
-                            } else {
-                                res.status(HttpStatus.BAD_REQUEST).send('This recipe does not have any ingredient');
-                            }
-                        });
-                    } else {
-                        res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Internal Server Error');
-                    }
+//      ADMINISTRATION
+router.post('/promotions', (req, res) => {
+    let data = req.body;
+    switch (data.promotion_type) {
+        case PromotionType.CATEGORY:
+            if (data.value_type == "€") {
+                getConnection.query(PROMOTIONS_QUERIES.insertValueCategoryPromotion, [data.name, data.description, data.promotion_type, data.category_id, data.value], (err, result, f) => {
+                    if (err) { console.error(err); return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send("Internal server Error"); }
+                    res.status(HttpStatus.ACCEPTED).send(true);
+                });
+            } else if (data.value_type == "%") {
+                getConnection.query(PROMOTIONS_QUERIES.insertPercentageCategoryPromotion, [data.name, data.description, data.promotion_type, data.category_id, data.value], (err, result, f) => {
+                    if (err) { console.error(err); return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send("Internal server Error"); }
+                    res.status(HttpStatus.ACCEPTED).send(true);
                 });
             }
-            else {
-                res.status(HttpStatus.UNAUTHORIZED).send('Authentication Required');
+            break;
+        case PromotionType.RECIPE:
+            if (data.value_type == "€") {
+                getConnection.query(PROMOTIONS_QUERIES.insertValueRecipePromotion, [data.name, data.description, data.promotion_type, data.recipe_id, data.value], (err, result, f) => {
+                    if (err) { console.error(err); return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send("Internal server Error"); }
+                    res.status(HttpStatus.ACCEPTED).send(true);
+                });
+            } else if (data.value_type == "%") {
+                getConnection.query(PROMOTIONS_QUERIES.insertPercentageRecipePromotion, [data.name, data.description, data.promotion_type, data.recipe_id, data.value], (err, result, f) => {
+                    if (err) { console.error(err); return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send("Internal server Error"); }
+                    res.status(HttpStatus.ACCEPTED).send(true);
+                });
             }
-        } else {
-            res.status(HttpStatus.BAD_REQUEST).send('At least one input is empty')
-        }
-    } else {
-        res.status(HttpStatus.BAD_REQUEST).send('At least one input is not defined')
+            break;
     }
+});
+
+router.delete('/promotions/:promotionsId', (req, res) => {
+    getConnection.query(PROMOTIONS_QUERIES.delete, [req.params.promotionsId], (err, resultRemove, fields) => {
+        if (err) {
+            res.status(HttpStatus.INTERNAL_SERVER_ERROR).send("Internal server Error");
+            console.error(err);
+        }
+        else {
+            res.status(HttpStatus.ACCEPTED).send("ok");
+        }
+    });
 });
 
 module.exports = router;

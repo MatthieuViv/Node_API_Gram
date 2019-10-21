@@ -1,228 +1,264 @@
 const express = require('express');
-const mysql = require('mysql');
+const file = require("../helpers/file.js");
 const HttpStatus = require('http-status-codes');
+const tokenChecker = require("../helpers/tokenChecker.js");
+
 const headerUserToken = 'usertoken';
-const RECIPE_TABLE = "recipe";
-const ID = "id";
-const RECIPE_TABLE_CATEGORY_ID = "category_id";
-const USER_LIKE_TABLE = "user_like";
-const USER_LIKE_TABLE_USER_ID = "user_id";
-const USER_LIKE_TABLE_RECIPE_ID = "recipe_id";
-const USER_DISLIKE_TABLE = "user_dislike";
-const USER_DISLIKE_TABLE_USER_ID = "user_id";
-const USER_DISLIKE_TABLE_RECIPE_ID = "recipe_id";
 
-
-const queryCheckIfTokenExistsAndCorrespondsToUser = 'SELECT id, connection_token from user where connection_token = ? AND id=?';
-const queryCheckIfTokenExists = 'SELECT connection_token from user where connection_token = ?';
-const SelectRecipe = "SELECT * FROM "+ RECIPE_TABLE +" WHERE "+ID+" = ?";
-const querySelectRecipePerCategory = "SELECT * FROM "+ RECIPE_TABLE +" WHERE "+RECIPE_TABLE_CATEGORY_ID+" = ?";
-const querySelectLikedRecipesOfUser = "SELECT * FROM "+ RECIPE_TABLE +" WHERE "+RECIPE_TABLE+".id = ?";
-
-// const queryCheckIfRecipeIsAlreadyLiked = "SELECT * from "+USER_LIKE_TABLE+" WHERE user_id = ? AND recipe_id = ?";
-const CheckIfRecipeIsAlreadyLiked = "SELECT * from "+USER_LIKE_TABLE+" WHERE " +USER_LIKE_TABLE_USER_ID+" = ? AND "+USER_LIKE_TABLE_RECIPE_ID+" = ?";
-const InsertLikedRecipe = "INSERT INTO "+USER_LIKE_TABLE+" ("+USER_LIKE_TABLE_USER_ID+","+USER_LIKE_TABLE_RECIPE_ID+") VALUES (?,?)";
-const DeleteLikedRecipe = "DELETE FROM "+USER_LIKE_TABLE+" WHERE "+USER_LIKE_TABLE_USER_ID+" = ? AND "+USER_LIKE_TABLE_RECIPE_ID+" = ?";
-const SelectDislikedRecipesOfUser = "SELECT * FROM "+ RECIPE_TABLE +" WHERE "+RECIPE_TABLE+".id = ?";
-const CheckIfRecipeIsAlreadyDisliked = "SELECT * from "+USER_DISLIKE_TABLE+" WHERE " +USER_DISLIKE_TABLE_USER_ID+" = ? AND "+USER_DISLIKE_TABLE_RECIPE_ID+" = ?";
-const InsertDislikedRecipe = "INSERT INTO "+USER_DISLIKE_TABLE+" ("+USER_DISLIKE_TABLE_USER_ID+","+USER_DISLIKE_TABLE_RECIPE_ID+") VALUES (?,?)";
-const DeleteDislikedRecipe = "DELETE FROM "+USER_DISLIKE_TABLE+" WHERE "+USER_DISLIKE_TABLE_USER_ID+" = ? AND "+USER_DISLIKE_TABLE_RECIPE_ID+" = ?";
-const SelectUserLikedRecipes = "SELECT id, category_id, name, description, price, picture_id, video_id FROM "+ RECIPE_TABLE+" INNER JOIN user_like ON recipe.id = user_like.recipe_id WHERE user_like.user_id = ?";
-// let queryString = "SELECT ustensiles.id, ustensiles.nom FROM "+ UTENSILS_TABLE +" JOIN "+RECIPE_UTENSILS_TABLE+" ON ustensiles.id = "+ RECIPE_UTENSILS_TABLE+".ustensiles_id JOIN "+ RECIPE_TABLE+" ON "+RECIPE_UTENSILS_TABLE+".recettes_id = "+RECIPE_TABLE+".id WHERE "+RECIPE_TABLE+".id = ?";
-
-function checkIfFieldsAreEmpty(... allFields){
-    console.log('checkUserInput : ' +allFields);
-    for (field  of allFields) {
-        if (field.toString().trim().length === 0){
-            console.log(field);
-            return false
-        }
-    }
-    return true;
-}
-
-function checkIfFieldsAreUndefined(... allFields){
-    console.log('checkUserInput : ' +allFields);
-    for (field  of allFields) {
-        if (typeof field === typeof undefined){
-            console.log(field);
-            return false
-        }
-    }
-    return true;
-}
-
-
+import {getConnection, checkIfFieldsAreUndefined, checkIfFieldsAreEmpty} from "../helpers/utils";
+import {USER_QUERIES, RECIPE_QUERIES} from "../helpers/queries";
 const router = express.Router();
-let connection = getConnection();
 
-router.get('/recipes/:recipeId', (req, res) => {
 
-    if (req.headers[headerUserToken] !== undefined) {
-        connection.query(queryCheckIfTokenExists, [req.headers[headerUserToken]], function (err, result, fields) {
-            connection.on('error', function(err) {
-                console.log('[MySQL Error] : ', err);
-            });
-            console.log(JSON.stringify(result[0]))
-            if (result && result.length > 0){
-                connection.query(SelectRecipe, [req.params.recipeId], (err, result, fields) => {
+router.get('/recipes', (req, res) => {
+    getConnection.query(RECIPE_QUERIES.selectAllRecipe, (err, result, fields) => {
+        if (err) {
+            console.log(err);
+            res.status(HttpStatus.INTERNAL_SERVER_ERROR).send("Internal Server Error");
+        }
+        else {
+            res.status(HttpStatus.ACCEPTED).send(result);
+        }
+    });
+});
+
+router.get('/recipes/category/:categoryId/filtered', (req, res) => {
+    let IDs = JSON.parse(req.query.IDs);
+    const categoryId = req.params.categoryId;
+    getConnection.query(RECIPE_QUERIES.selectFilteredRecipe, [categoryId, IDs, IDs.length], (err, result, fields) => {
+        if (err) {
+            console.log(err);
+            res.status(HttpStatus.INTERNAL_SERVER_ERROR).send("Internal Server Error");
+        }
+        else {
+            res.status(HttpStatus.ACCEPTED).send(JSON.stringify(result));
+        }
+    });
+
+});
+
+router.post('/recipe', (req, res) => {
+    file.uploadCarousel(req, function (err, fields) {
+        if (err) { console.error(err); return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send("Internal server Error"); }
+        getConnection.query(RECIPE_QUERIES.insert, [fields.name, fields.category, fields.description, fields.price, fields.video_id, fields.imageIDs[0]], (err, result, f) => {
+            if (err) {
+                res.status(HttpStatus.INTERNAL_SERVER_ERROR).send("Internal server Error");
+                console.error(err);
+            }
+            else {
+                const recipe_id = result.insertId;
+                const steps = Object.keys(fields)
+                    .filter(key => key.includes("step"))
+                    .reduce((obj, key) => {
+                        let splited = key.split("_");
+                        let i = splited[2] - 1;
+                        if (!obj[i]) {
+                            obj[i] = [recipe_id, i + 1];
+                        }
+                        obj[i].push(fields[key]);
+                        return obj;
+                    }, []);
+                //////////////////
+
+                getConnection.query(RECIPE_QUERIES.insertRecipe_instructions, [steps], (err, result, f) => {
                     if (err) {
-                        console.log(err);
-                        res.status(HttpStatus.INTERNAL_SERVER_ERROR).send("Internal Server Error");
+                        res.status(HttpStatus.INTERNAL_SERVER_ERROR).send("Internal server Error");
+                        console.error(err);
                     }
-                    else if(result && result.length > 0){
-                        res.status(HttpStatus.ACCEPTED).send(JSON.stringify(result[0]))
-                    } else {
-                        res.status(HttpStatus.BAD_REQUEST).send('RecipeId do not match any recipe');
-                    }
-                });
-            } else {
-                res.status(HttpStatus.UNAUTHORIZED).send('Connection token not valid');
-            }
-        })
-    } else {
-        res.status(HttpStatus.UNAUTHORIZED).send('Authentication Required');
-    }
-});
+                    else {
 
-router.get('/recipes/category/:categoryId', (req, res) => {
-    if (req.headers[headerUserToken] !== undefined) {
-        connection.query(queryCheckIfTokenExists, [req.headers[headerUserToken]], function (err, result, fields) {
-            connection.on('error', function(err) {
-                console.log('[MySQL Error] : ', err);
-            });
-            console.log(JSON.stringify(result[0]))
-            if (result && result.length > 0){
-                connection.query(querySelectRecipePerCategory, [req.params.categoryId], (err, result, fields) => {
-                    if (err) {
-                        console.log(err);
-                        res.status(HttpStatus.INTERNAL_SERVER_ERROR).send("Internal Server Error");
-                    }
-                    else if(result && result.length > 0){
-                        res.status(HttpStatus.ACCEPTED).send(JSON.stringify(result[0]))
-                    } else {
-                        res.status(HttpStatus.BAD_REQUEST).send('CategoryId do not match any recipe');
-                    }
-                });
-            } else {
-                res.status(HttpStatus.UNAUTHORIZED).send('Connection token not valid');
-            }
-        })
-    } else {
-        res.status(HttpStatus.UNAUTHORIZED).send('Authentication Required');
-    }
-});
+                        const ingredients = Object.keys(fields)
+                            .filter(key => key.includes("ingredient"))
+                            .reduce((obj, key) => {
+                                let splited = key.split("_");
+                                let i = splited[2] - 1;
+                                if (!obj[i]) {
+                                    obj[i] = [recipe_id];
+                                }
+                                obj[i].push(fields[key]);
+                                return obj;
+                            }, []);
 
-router.get('/recipes/user/like/:userId', (req, res) => {
+                        getConnection.query(RECIPE_QUERIES.insertRecipe_ingredients, [ingredients], (err, result, f) => {
+                            if (err) {
+                                res.status(HttpStatus.INTERNAL_SERVER_ERROR).send("Internal server Error");
+                                console.error(err);
+                            }
+                            else {
 
-    if(req.headers[headerUserToken] !== undefined) {
-        connection.query(queryCheckIfTokenExistsAndCorrespondsToUser, [req.headers[headerUserToken], req.params.userId], function (err, result, fields) {
-            connection.on('error', function (err) {
-                console.log('[MySQL Error]' +err);
-                res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Internal server Error');
-            });
-            if (result && result.length > 0) {
-                connection.query(SelectUserLikedRecipes, [req.params.userId], function (err, result, fields) {
-                    connection.on('error', function (err){
-                        console.log('[MySQL ERROR] : '+ err);
-                        res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Internal server Error');
-                    });
-                    if (result && result.length > 0){
-                        res.status(HttpStatus.OK).send(JSON.stringify(result));
-                    } else {
-                        res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Problem with the query');
-                    }
-                });
-            } else {
-                res.status(HttpStatus.BAD_REQUEST).send('Token and userId do not match');
-            }
-        });
-    } else {
-        res.status(HttpStatus.UNAUTHORIZED).send('Authentication Required');
-    }
+                                const pictures = fields.imageIDs.reduce((obj, id) => {
+                                    obj.push([recipe_id, id]);
+                                    return obj;
+                                }, []);
 
+                                getConnection.query(RECIPE_QUERIES.insertRecipe_pictures, [pictures], (err, result, f) => {
+                                    if (err) {
+                                        res.status(HttpStatus.INTERNAL_SERVER_ERROR).send("Internal server Error");
+                                        console.error(err);
+                                    }
+                                    else {
 
+                                        const utensils = Object.keys(fields)
+                                            .filter(key => key.includes("utensil"))
+                                            .reduce((obj, key) => {
+                                                obj.push([recipe_id, fields[key]]);
+                                                return obj;
+                                            }, []);
 
-
-});
-
-router.post('/recipes/user/like/:userId', (req, res) => {
-
-    let post_data = req.body;
-    let inputUserId = req.params.userId;
-    let inputRecipeId = post_data.inputRecipeId;
-
-    if (checkIfFieldsAreUndefined(inputRecipeId, inputUserId)) {
-        if(checkIfFieldsAreEmpty(inputRecipeId, inputUserId)){
-            if(req.headers[headerUserToken] !== undefined){
-                connection.query(queryCheckIfTokenExistsAndCorrespondsToUser, [req.headers[headerUserToken], inputUserId], function (err, result, fields) {
-                    connection.on('error', function(err) {
-                        console.log('[MySQL Error]', +err)
-                    });
-                    if (result && result.length > 0) { //IF the connection token matches the user id
-                        connection.query(SelectRecipe, [inputRecipeId], (err, result, fields) => { //Checking if the recipe is in the database
-                            connection.on('error', function(err) {
-                                console.log('[MySQL Error]' +err);
-                                res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Internal server Error');
-                            });
-                            if (result && result.length >0){
-                                connection.query(CheckIfRecipeIsAlreadyLiked, [inputUserId, inputRecipeId], (err, result, fields) => {
-                                    if(err){
-                                        console.log('[MySQL Error]' +err);
-                                        res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Internal server Error');
-
-                                    } else if( result && result.length >0){ //If there is a result to the request
-                                        res.status(HttpStatus.BAD_REQUEST).send('Recipe is already Liked');
-
-                                    } else { //If there is no result we insert the row in the table
-                                        console.log('Query to Insert the recipe to the database');
-                                        connection.query(InsertLikedRecipe, [inputUserId, inputRecipeId], (err, result, fields) => {
-                                            if(err){
-                                                console.log('[MySQL Error]' +err);
-                                                res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Internal server Error');
-                                            } else if (result.affectedRows){ //If this field is present it means the row was inserted. We tested .affectedRows and not .insertId because this table does not have an id column, so it can't be returned by the sql database
-                                                console.log('Rows : '+JSON.stringify(result));
-                                                console.log('Should Remove the recipe from the dislikes');
-                                                connection.query(DeleteDislikedRecipe, [inputUserId, inputRecipeId], (err, result, fields) => {
-                                                    connection.on('error', function(err){
-                                                        console.log('[MySQL Error]', +err)
-                                                        res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Internal server Error');
-                                                    });
-                                                    if(result.affectedRows){
-                                                        res.status(HttpStatus.OK).send('Recipe Inserted in the like table and remove from the disliked table');
-                                                    } else {
-                                                        res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Recipe Inserted and was not present in the dislike table');
+                                        getConnection.query(RECIPE_QUERIES.insertRecipe_utensils, [utensils], (err, result, f) => {
+                                            if (err) {
+                                                res.status(HttpStatus.INTERNAL_SERVER_ERROR).send("Internal server Error");
+                                                console.error(err);
+                                            }
+                                            else {
+                                                const filters = Object.keys(fields)
+                                                    .filter(key => key.includes("filters"))
+                                                    .reduce((obj, key) => {
+                                                        obj.push([recipe_id, fields[key]]);
+                                                        return obj;
+                                                    }, []);
+                                                getConnection.query(RECIPE_QUERIES.insertRecipe_filters, [utensils], (err, result, f) => {
+                                                    if (err) {
+                                                        res.status(HttpStatus.INTERNAL_SERVER_ERROR).send("Internal server Error");
+                                                        console.error(err);
+                                                    }
+                                                    else {
+                                                        res.status(HttpStatus.ACCEPTED).send(true);
                                                     }
                                                 });
-                                            } else {
-                                                /*console.log('Result: ' + result);
-                                                console.log('Result stringify : ' + JSON.stringify(result));*/
-                                                res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Internal server Error');
                                             }
                                         });
                                     }
                                 });
-                            } else{
-                                res.status(HttpStatus.BAD_REQUEST).send('Recipe id does not match any recipe');
                             }
                         });
-                    } else {
-                        res.status(HttpStatus.BAD_REQUEST).send('Token and userId do not match');
                     }
                 });
-            } else {
-                res.status(HttpStatus.UNAUTHORIZED).send('Authentication Required');
             }
-        } else {
-            res.status(HttpStatus.BAD_REQUEST).send('At least one input is empty');
-        }
-    } else {
-        res.status(HttpStatus.BAD_REQUEST).send('At least one input is not defined')
-    }
+        });
+    });
 });
 
-router.get('/recipes/user/dislike/:userId', (req, res) => {
+router.delete('/recipe/:recipeId', (req, res) => {
+    getConnection.query(RECIPE_QUERIES.select, [req.params.recipeId], (err, result, fields) => {
+        if (err) {
+            res.status(HttpStatus.INTERNAL_SERVER_ERROR).send("Internal server Error");
+            console.log(err);
+        }
+        else if (result.length === 0) {
+            res.status(HttpStatus.BAD_REQUEST).send('Category ID Not defined');
+        } else {
+            getConnection.query(RECIPE_QUERIES.delete, [req.params.recipeId], (err, resultRemove, fields) => {
+                if (err) {
+                    res.status(HttpStatus.INTERNAL_SERVER_ERROR).send("Internal server Error");
+                    console.error(err);
+                }
+                else {
+                    file.removeFolder("/recipes_carousel/" + result[0].name);
+                    res.status(HttpStatus.ACCEPTED).send("ok");
+                }
+            });
+        }
+    });
+});
 
+router.get('/recipes/byNameAndId', (req, res) => {
+    getConnection.query(RECIPE_QUERIES.selectRecipeNameID, (err, result, fields) => {
+        console.log(result);
+        if (err) {
+            console.log(err);
+            res.status(HttpStatus.INTERNAL_SERVER_ERROR).send("Internal Server Error");
+        }
+        else if (result && result.length > 0) {
+            res.status(HttpStatus.ACCEPTED).send(result);
+        } else {
+            res.status(HttpStatus.BAD_REQUEST).send('RecipeId do not match any recipe');
+        }
+    });
+});
+
+router.get('/recipes/:recipeId', (req, res) => {
+    getConnection.query(RECIPE_QUERIES.select, [req.params.recipeId], (err, result, fields) => {
+        if (err) {
+            console.log(err);
+            res.status(HttpStatus.INTERNAL_SERVER_ERROR).send("Internal Server Error");
+        }
+        else if (result && result.length > 0) {
+            res.status(HttpStatus.ACCEPTED).send(JSON.stringify(result[0]))
+        } else {
+            res.status(HttpStatus.BAD_REQUEST).send('RecipeId do not match any recipe');
+        }
+    });
+});
+
+router.get('/recipes/category/:categoryId', (req, res) => {
+    getConnection.query(RECIPE_QUERIES.selectRecipePerCategory, [req.params.categoryId], (err, result, fields) => {
+        if (err) {
+            console.log(err);
+            res.status(HttpStatus.INTERNAL_SERVER_ERROR).send("Internal Server Error");
+        }
+        else if (result && result.length > 0) {
+            res.status(HttpStatus.ACCEPTED).send(JSON.stringify(result))
+        } else {
+            res.status(HttpStatus.BAD_REQUEST).send('CategoryId do not match any recipe');
+        }
+    });
+});
+
+router.get('/recipes/user/like/:userId', (req, res) => {
+    getConnection.query(RECIPE_QUERIES.selectUserLikedRecipes, [req.params.userId], function (err, result, fields) {
+        getConnection.on('error', function (err) {
+            console.log('[MySQL ERROR] : ' + err);
+            res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Internal server Error');
+        });
+        if (result && result.length > 0) {
+            res.status(HttpStatus.OK).send(JSON.stringify(result));
+        } else {
+            res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Problem with the query');
+        }
+    });
+});
+
+router.post('/recipes/user/like/:recipeId', tokenChecker(getConnection), (req, res) => {
+
+    const params = req.params;
+    const recipeId = params.recipeId;
+    const userId = res.locals.userInfo.id;
+
+    if (!(checkIfFieldsAreEmpty(recipeId, userId) && checkIfFieldsAreUndefined(recipeId, userId))) {
+        return res.status(HttpStatus.BAD_REQUEST).send('At least one input is empty');
+    }
+
+    getConnection.query(RECIPE_QUERIES.select, [recipeId], (err, result, fields) => { //Checking if the recipe is in the database
+        if (err) {
+            console.log('[MySQL Error]' + err);
+            return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Internal server Error');
+        }
+        if (!(result && result.length > 0)) return res.status(HttpStatus.BAD_REQUEST).send('Recipe id does not match any recipe');
+
+        getConnection.query(RECIPE_QUERIES.checkIfRecipeIsAlreadyLiked, [userId, recipeId], (err, result, fields) => {
+            if (err) {
+                console.log('[MySQL Error]' + err);
+                return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Internal server Error');
+            } else if (result && result.length > 0) { //If there is a result to the request
+                getConnection.query(RECIPE_QUERIES.deleteLikedRecipe, [userId, recipeId], (err, result, fields) => {
+                    if (err) {
+                        console.error('[MySQL Error]' + err);
+                        return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Internal server Error');
+                    }
+                    res.status(HttpStatus.OK).send('Recipe removed from like');
+                });
+            } else { //If there is no result we insert the row in the table
+                getConnection.query(RECIPE_QUERIES.insertLikedRecipe, [userId, recipeId], (err, result, fields) => {
+                    if (err) {
+                        console.error('[MySQL Error]' + err);
+                        return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Internal server Error');
+                    }
+                    res.status(HttpStatus.OK).send('Recipe inserted inserted in like');
+                });
+            }
+        });
+    });
 });
 
 router.post('/recipes/user/dislike/:userId', (req, res) => {
@@ -231,83 +267,67 @@ router.post('/recipes/user/dislike/:userId', (req, res) => {
     let inputUserId = req.params.userId;
     let inputRecipeId = post_data.inputRecipeId;
 
-    if (checkIfFieldsAreUndefined(inputRecipeId, inputUserId)) {
-        if(checkIfFieldsAreEmpty(inputRecipeId, inputUserId)){
-            if(req.headers[headerUserToken] !== undefined){
-                connection.query(queryCheckIfTokenExistsAndCorrespondsToUser, [req.headers[headerUserToken], inputUserId], function (err, result, fields) {
-                    connection.on('error', function(err) {
-                        console.log('[MySQL Error]', +err)
-                    });
-                    if (result && result.length > 0) { //IF the connection token matches the user id
-                        connection.query(SelectRecipe, [inputRecipeId], (err, result, fields) => { //Checking if the recipe is in the database
-                            connection.on('error', function(err) {
-                                console.log('[MySQL Error]' +err);
-                                res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Internal server Error');
-                            });
-                            if (result && result.length >0){
-                                connection.query(CheckIfRecipeIsAlreadyDisliked, [inputUserId, inputRecipeId], (err, result, fields) => {
-                                    if(err){
-                                        console.log('[MySQL Error]' +err);
-                                        res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Internal server Error');
-
-                                    } else if( result && result.length >0){ //If there is a result to the request
-                                        res.status(HttpStatus.BAD_REQUEST).send('Recipe is already Disliked');
-
-                                    } else { //If there is no result we insert the row in the table
-                                        console.log('Query to Insert the recipe to the database');
-                                        connection.query(InsertDislikedRecipe, [inputUserId, inputRecipeId], (err, result, fields) => {
-                                            if(err){
-                                                console.log('[MySQL Error]' +err);
-                                                res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Internal server Error');
-                                            } else if (result.affectedRows){ //If this field is present it means the row was inserted. We tested .affectedRows and not .insertId because this table does not have an id column, so it can't be returned by the sql database
-                                                console.log('Rows : '+JSON.stringify(result));
-                                                console.log('Should Remove the recipe from the dislikes');
-                                                connection.query(DeleteLikedRecipe, [inputUserId, inputRecipeId], (err, result, fields) => {
-                                                    connection.on('error', function(err){
-                                                        console.log('[MySQL Error]', +err)
-                                                        res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Internal server Error');
-                                                    });
-                                                    if(result.affectedRows){
-                                                        res.status(HttpStatus.OK).send('Recipe inserted in the Dislike table and remove from the liked table');
-                                                    } else {
-                                                        res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Internal server Error');
-                                                    }
-                                                });
-                                            } else {
-                                                /*console.log('Result: ' + result);
-                                                console.log('Result stringify : ' + JSON.stringify(result));*/
-                                                res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Internal server Error');
-                                            }
-                                        });
-                                    }
-                                });
-                            } else{
-                                res.status(HttpStatus.BAD_REQUEST).send('Recipe id does not match any recipe');
-                            }
-                        });
-                    } else {
-                        res.status(HttpStatus.BAD_REQUEST).send('Token and userId do not match');
-                    }
+    if (checkIfFieldsAreEmpty(inputRecipeId, inputUserId) && checkIfFieldsAreUndefined(inputRecipeId, inputUserId)) {
+        if (req.headers[headerUserToken] !== undefined) {
+            getConnection.query(USER_QUERIES.checkIfTokenExistsAndCorrespondsToUser, [req.headers[headerUserToken], inputUserId], function (err, result, fields) {
+                getConnection.on('error', function (err) {
+                    console.log('[MySQL Error]', +err)
                 });
-            } else {
-                res.status(HttpStatus.UNAUTHORIZED).send('Authentication Required');
-            }
+                if (result && result.length > 0) { //IF the getConnection token matches the user id
+                    getConnection.query(RECIPE_QUERIES.select, [inputRecipeId], (err, result, fields) => { //Checking if the recipe is in the database
+                        getConnection.on('error', function (err) {
+                            console.log('[MySQL Error]' + err);
+                            res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Internal server Error');
+                        });
+                        if (result && result.length > 0) {
+                            getConnection.query(RECIPE_QUERIES.checkIfRecipeIsAlreadyDisliked, [inputUserId, inputRecipeId], (err, result, fields) => {
+                                if (err) {
+                                    console.log('[MySQL Error]' + err);
+                                    res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Internal server Error');
+
+                                } else if (result && result.length > 0) { //If there is a result to the request
+                                    res.status(HttpStatus.BAD_REQUEST).send('Recipe is already Disliked');
+
+                                } else { //If there is no result we insert the row in the table
+                                    console.log('Query to Insert the recipe to the database');
+                                    getConnection.query(RECIPE_QUERIES.insertDislikedRecipe, [inputUserId, inputRecipeId], (err, result, fields) => {
+                                        if (err) {
+                                            console.log('[MySQL Error]' + err);
+                                            res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Internal server Error');
+                                        } else if (result.affectedRows) { //If this field is present it means the row was inserted. We tested .affectedRows and not .insertId because this table does not have an id column, so it can't be returned by the sql database
+                                            console.log('Rows : ' + JSON.stringify(result));
+                                            console.log('Should Remove the recipe from the dislikes');
+                                            getConnection.query(RECIPE_QUERIES.deleteDislikedRecipe, [inputUserId, inputRecipeId], (err, result, fields) => {
+                                                getConnection.on('error', function (err) {
+                                                    console.log('[MySQL Error]', +err);
+                                                    res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Internal server Error');
+                                                });
+                                                if (result.affectedRows) {
+                                                    res.status(HttpStatus.OK).send('Recipe inserted in the Dislike table and remove from the liked table');
+                                                } else {
+                                                    res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Internal server Error');
+                                                }
+                                            });
+                                        } else {
+                                            res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Internal server Error');
+                                        }
+                                    });
+                                }
+                            });
+                        } else {
+                            res.status(HttpStatus.BAD_REQUEST).send('Recipe id does not match any recipe');
+                        }
+                    });
+                } else {
+                    res.status(HttpStatus.BAD_REQUEST).send('Token and userId do not match');
+                }
+            });
         } else {
-            res.status(HttpStatus.BAD_REQUEST).send('At least one input is empty');
+            res.status(HttpStatus.UNAUTHORIZED).send('Authentication Required');
         }
     } else {
-        res.status(HttpStatus.BAD_REQUEST).send('At least one input is not defined')
+        res.status(HttpStatus.BAD_REQUEST).send('At least one input is empty');
     }
 });
-
-function getConnection() {
-    let connection = mysql.createConnection({
-        host     : 'localhost',
-        user: 'root',
-        password : 'password',
-        database : 'gram'
-    });
-    return connection;
-}
 
 module.exports = router;

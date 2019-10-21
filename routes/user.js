@@ -1,24 +1,11 @@
 const express = require('express');
-
 const crypto = require('crypto');
-const uuid = require('uuid');
-const emailValidator = require("email-validator");
-const passwordValidator = require('password-validator');
-const libPhoneNumber = require('libphonenumber-js');
 const HttpStatus = require('http-status-codes');
 
 const headerUserToken = 'usertoken';
-const CheckIfTokenExistsAndCorrespondsToUser = 'SELECT id, connection_token from user where connection_token = ? AND id=?';
-const SelectUserSafely = 'SELECT id, email_address, name, first_name, phone_number, postal_address, connection_token FROM user where email_address=?';
-const SelectUserWithEmail = 'SELECT id, email_address, name, first_name, phone_number, postal_address, salt, password FROM user where email_address=?';
-const SelectUserWithId = 'SELECT id, email_address, name, first_name, phone_number, postal_address, connection_token FROM user where id=?';
-const UpdateUserToken = 'UPDATE user SET last_connection_datetime = NOW(), connection_token = ? WHERE email_address =?';
-const InsertUser = 'INSERT INTO user (email_address, name, first_name, password, phone_number, postal_address, register_datetime, salt, last_connection_datetime, connection_token) VALUES (?,?,?,?,?,?, NOW(), ?, NOW(), ?)';
-const UpdateUser = 'UPDATE user SET email_address = ? , name = ? , first_name = ?, password = ?, phone_number = ?, postal_address = ?, salt = ? WHERE id = ?';
 
-import {USER_QUERIES} from "../Utils/Queries";
-
-import {getConnection} from '../Utils/Helper';
+import {getConnection, checkIfFieldsAreUndefined, checkIfFieldsAreEmpty, checkPassword, checkEmailValidity, convertToInternationalFormat, checkHashPassword} from '../helpers/utils';
+import {USER_QUERIES} from "../helpers/queries";
 
 let genRandomString = function(length){
     return crypto.randomBytes(Math.ceil(length/2))
@@ -42,66 +29,15 @@ function saltHashPassword(userPassword){
     return passwordData;
 }
 
-function checkHashPassword(user_password, salt) {
-    let passwordData = sha512(user_password, salt);
-    return passwordData;
-}
-
-function convertToInternationalFormat(phoneNumber){
-    let asYouType = new libPhoneNumber.AsYouType('FR').input(phoneNumber);
-    let phoneNumberFromString = libPhoneNumber.parsePhoneNumberFromString(asYouType, 'FR');
-    let internationalFormat = phoneNumberFromString.formatInternational();
-    return internationalFormat.replace(/\s+/g, '');
-}
-
-function checkEmailValidity(email){
-    return emailValidator.validate(email);
-}
-
-function checkPassword(password){
-    let schema = new passwordValidator();
-    schema
-        .is().min(6)                                    // Minimum length 86
-        .is().max(70)                                   // Maximum length 70
-        .has().uppercase()                              // Must have uppercase letters
-        .has().lowercase()                              // Must have lowercase letters
-        .has().digits()                                 // Must have digits
-        .has().not().spaces()                           // Should not have spaces
-
-    return schema.validate(password);
-}
-
-function checkIfFieldsAreEmpty(... allFields){
-    console.log('checkUserInput : ' +allFields);
-    for (field  of allFields) {
-        if (field.toString().trim().length === 0){
-            console.log(field);
-            return false
-        }
-    }
-    return true;
-}
-
-function checkIfFieldsAreUndefined(... allFields){
-    console.log('checkUserInput : ' +allFields);
-    for (field  of allFields) {
-        if (typeof field === typeof undefined){
-            console.log(field);
-            return false
-        }
-    }
-    return true;
-}
-
 const router = express.Router();
 
-router.post('/users/register',(req, res, next)=> {
+router.get('/checkConnexion', tokenChecker(getConnection), (req, res) => {
+    const userInfo = res.locals.userInfo;
+    res.status(HttpStatus.OK).send(userInfo);
+});
 
-    const connection = getConnection();
-
+router.post('/users/register', (req, res, next) => {
     let post_data = req.body; //Get POST params
-    console.log('post_data : '+JSON.stringify(post_data))
-
     let inputEmail = post_data.inputEmail;
     let plaint_password = post_data.inputPassword;  //Get the plaintext userPassword
     let inputName = post_data.inputName;
@@ -109,131 +45,96 @@ router.post('/users/register',(req, res, next)=> {
     let inputPhoneNumber = post_data.inputPhoneNumber;
     let inputPostalAddress = post_data.inputPostalAddress;
 
-    if (checkIfFieldsAreUndefined(inputEmail, plaint_password, inputName, inputFirstName, inputPhoneNumber, inputPostalAddress)) {
-        console.log('Inside checkIfFieldsAreUndefined()');
-
-        if(checkIfFieldsAreEmpty(inputEmail, plaint_password, inputName, inputFirstName, inputPhoneNumber, inputPostalAddress)){
-            console.log('Inside checkIfFieldsAreEmpty()');
-            let hash_data = saltHashPassword(plaint_password);
-            let userPassword = hash_data.passwordHash;
-            let salt = hash_data.salt;
-            let uid = uuid.v4();
-            inputPhoneNumber = convertToInternationalFormat(inputPhoneNumber);
-
-            if (checkIfFieldsAreEmpty(inputName, inputFirstName, inputEmail, inputPhoneNumber, inputPostalAddress, plaint_password) && checkEmailValidity(inputEmail) && checkPassword(plaint_password)){
-
-                connection.query(SelectUserWithEmail, [inputEmail] , function(err, result, fields) {
-                    connection.on('error', function (err) {
-                        console.log('[MySQL ERROR]: ', err);
-                    });
-                    if (result && result.length ){
-                       /* console.log('Result : '+result);
-                        console.log('Result Json.stringify : '+JSON.stringify(result));
-                        console.log('Fields : '+fields);
-                        console.log('Fields Json.stringify : '+JSON.stringify(fields));*/
-                        res.status(HttpStatus.CONFLICT).send('User Already Exists');
-                    }
-                    else {
-                        connection.query(InsertUser, [inputEmail, inputName, inputFirstName, userPassword, inputPhoneNumber, inputPostalAddress, salt, uid], (err, result, fields) => {
-                            connection.on('error', function (err) {
-                                console.log('[MySQL ERROR', err);
-                                res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Register error: ', err);
-                            });
-                            if (result.insertId) {
-                                connection.query(SelectUserWithId, [result.insertId], (err, result, fields) => {
-                                    connection.on('error', function (err) {
-                                        console.log('[MySQL ERROR', err);
-                                        res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Register error: ', err);
-                                    });
-                                    if(result && result.length > 0){
-                                        console.log('Result : '+JSON.stringify(result[0]))
-                                        res.status(HttpStatus.CREATED).send(JSON.stringify(result[0]));
-                                    } else {
-                                        res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Register error: ', err);
-                                    }
-                                });
-                            } else {
-                                res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Register error: ', err);
-                            }
-                        });
-                    }
-                });
-            } else {
-                res.status(HttpStatus.BAD_REQUEST).send('User inputs are not correct');
-            }
-        } else {
-            res.status(HttpStatus.BAD_REQUEST).send('At least one input is empty');
-        }
-    } else {
-        res.status(HttpStatus.BAD_REQUEST).send('At least one input is not defined')
+    if (!(checkIfFieldsAreUndefined(inputEmail, plaint_password, inputName, inputFirstName, inputPhoneNumber, inputPostalAddress) && checkIfFieldsAreEmpty(inputEmail, plaint_password, inputName, inputFirstName, inputPhoneNumber, inputPostalAddress)) ) {
+        return res.status(HttpStatus.BAD_REQUEST).send('Merci de remplir les champs.');
     }
+    if (!checkEmailValidity(inputEmail)) {
+        return res.status(HttpStatus.BAD_REQUEST).send('Adresse email non valide.');
+    }
+    if (!checkPassword(plaint_password)) {
+        return res.status(HttpStatus.BAD_REQUEST).send('Mot de passe non valide.');
+    }
+
+    let hash_data = saltHashPassword(plaint_password);
+    let userPassword = hash_data.passwordHash;
+    let salt = hash_data.salt;
+    let uid = uuid.v4();
+    inputPhoneNumber = convertToInternationalFormat(inputPhoneNumber);
+    if (!inputPhoneNumber) {
+        return res.status(HttpStatus.BAD_REQUEST).send('Numéro de téléphone non valide.');
+    }
+
+    getConnection.query(USER_QUERIES.selectWithEmail, [inputEmail], function (err, result, fields) {
+        if (err) {
+            console.log('[MySQL ERROR', err);
+            return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Internal Error');
+        }
+        if (result && result.length) {
+            return res.status(HttpStatus.CONFLICT).send('Cette adresse email est déja utilisée');
+        }
+        getConnection.query(USER_QUERIES.insert, [inputEmail, inputName, inputFirstName, userPassword, inputPhoneNumber, inputPostalAddress, salt, uid], (err, result, fields) => {
+            if (err) {
+                console.log('[MySQL ERROR', err);
+                return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Internal Error');
+            }
+            getConnection.query(USER_QUERIES.selectWithId, [result.insertId], (err, result, fields) => {
+                if (err) {
+                    console.log('[MySQL ERROR', err);
+                    return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Internal Error');
+                }
+                res.status(HttpStatus.CREATED).send(JSON.stringify(result[0]));
+            });
+        });
+    });
 });
 
-router.post('/users/login', (req, res, next)=> {
-
-    console.log('Route : users/login: ');
-    const  connection = getConnection();
-
+router.post('/users/login', (req, res, next) => {
     let post_data = req.body;
     let inputPassword = post_data.inputPassword;
     let inputEmail = post_data.inputEmail;
 
-    if (checkIfFieldsAreEmpty(inputEmail, inputPassword) && checkEmailValidity(inputEmail) && checkPassword(inputPassword)) {
-        connection.query(SelectUserWithEmail, [inputEmail] , function(err, result, fields) {
-            connection.on('error', function (err) {
-                console.log('[MySQL ERROR]', err);
+    getConnection.query(USER_QUERIES.selectWithEmail, [inputEmail], function (err, result, fields) {
+        if (err) {
+            console.log('[MySQL ERROR', err);
+            return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Internal Error');
+        }
+        if (!(result && result.length)) {
+            return res.status(HttpStatus.BAD_REQUEST).send('Connexion impossible');
+        }
+        let salt = result[0].salt;
+        let encrypted_password = result[0].password;
+        let hashed_password = checkHashPassword(inputPassword, salt).passwordHash;
+        let newToken = uuid.v4();
+        if (encrypted_password != hashed_password) {
+            return res.status(HttpStatus.BAD_REQUEST).send('Connexion impossible');
+        }
+        getConnection.query(USER_QUERIES.updateUserToken, [newToken, inputEmail], function (err, result, fields) {
+            if (err) {
+                console.log('[MySQL ERROR', err);
+                return res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Internal Error');
+            }
+            getConnection.query(USER_QUERIES.selectWithEmail, [inputEmail], function (err, result, fields) {
+                getConnection.on('error', function (err) {
+                    console.log('[MySQL ERROR]', err);
+                });
+                if (result && result.length > 0) {
+                    res.status(HttpStatus.OK).send({ token: result[0].getConnection_token, id: result[0].id }); //Send the token and ID back to the user
+                } else {
+                    console.log('Internal server error');
+                    res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Internal Server Error');
+                }
             });
-            // console.log(result);
-            if (result && result.length ){
-                let salt = result[0].salt;
-                let encrypted_password = result[0].password;
-                console.log('Encrypted password : ' +encrypted_password);
-                let hashed_password = checkHashPassword(inputPassword, salt).passwordHash;
-                console.log('hashed password : ' +hashed_password);
-                let newToken = uuid.v4();
-                if (encrypted_password === hashed_password) {
-                    connection.query(UpdateUserToken, [newToken, inputEmail], function (err, result, fields) {
-                        connection.on('error', function (err) {
-                            console.log('[MySQL ERROR]', err);
-                            //res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Internal Server Error');
-                        });
-                        if (typeof result !== typeof undefined){
-                            connection.query(SelectUserSafely, [inputEmail], function (err, result, fields) {
-                                connection.on('error', function (err) {
-                                    console.log('[MySQL ERROR]', err);
-                                });
-                                if (result && result.length >0){
-                                    console.log(JSON.stringify(result[0].connection_token))
-                                    res.status(HttpStatus.OK).send(JSON.stringify(result[0].connection_token)); //Send the token and ID back to the user
-                                } else {
-                                    console.log('Internal server error');
-                                    res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Internal Server Error');
-                                }
-                            });
-                        } else {
-                            console.log('Internal server error');
-                            res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Internal Server Error');
-                        }
-                    });
-                } else
-                    res.end(JSON.stringify('Wrong password'))
-            }
-            else {
-                res.status(HttpStatus.BAD_REQUEST).json('User does not exist');
-            }
         });
-    } else {
-        res.status(HttpStatus.BAD_REQUEST).send('User Input are not correct');
-    }
+    });
 });
 
-router.post('/users/update',(req, res, next)=> {
+router.post('/users/update', (req, res, next) => {
 
-    if (req.headers[headerUserToken] !== undefined){
-        const connection = getConnection();
+    if (req.headers[headerUserToken] !== undefined) {
+
 
         let post_data = req.body; //Get POST params
-        console.log('post_data : '+JSON.stringify(post_data))
+        console.log('post_data : ' + JSON.stringify(post_data))
 
         let inputEmail = post_data.inputEmail;
         let inputUserId = post_data.inputUserId;
@@ -245,29 +146,29 @@ router.post('/users/update',(req, res, next)=> {
 
         if (checkIfFieldsAreUndefined(inputEmail, plaint_password, inputName, inputFirstName, inputPhoneNumber, inputPostalAddress, inputUserId)) {
 
-            if(checkIfFieldsAreEmpty(inputEmail, plaint_password, inputName, inputFirstName, inputPhoneNumber, inputPostalAddress, inputUserId)){
+            if (checkIfFieldsAreEmpty(inputEmail, plaint_password, inputName, inputFirstName, inputPhoneNumber, inputPostalAddress, inputUserId)) {
                 let hash_data = saltHashPassword(plaint_password);
                 let userPassword = hash_data.passwordHash;
                 let salt = hash_data.salt;
                 inputPhoneNumber = convertToInternationalFormat(inputPhoneNumber);
 
-                if (checkIfFieldsAreEmpty(inputName, inputFirstName, inputEmail, inputPhoneNumber, inputPostalAddress, plaint_password, inputUserId) && checkEmailValidity(inputEmail)){
+                if (checkIfFieldsAreEmpty(inputName, inputFirstName, inputEmail, inputPhoneNumber, inputPostalAddress, plaint_password, inputUserId) && checkEmailValidity(inputEmail)) {
 
-                    connection.query(CheckIfTokenExistsAndCorrespondsToUser, [req.headers[headerUserToken], inputUserId] , function(err, result, fields) {
-                        connection.on('error', function (err) {
+                    getConnection.query(USER_QUERIES.checkIfTokenExistsAndCorrespondsToUser, [req.headers[headerUserToken], inputUserId], function (err, result, fields) {
+                        getConnection.on('error', function (err) {
                             console.log('[MySQL ERROR]: ', err);
                         });
-                        if (result && result.length > 0){
-                            connection.query(UpdateUser, [inputEmail, inputName, inputFirstName, userPassword, inputPhoneNumber, inputPostalAddress, salt, inputUserId], (err, result, fields) => {
-                                connection.on('error', function (err) {
+                        if (result && result.length > 0) {
+                            getConnection.query(USER_QUERIES.update, [inputEmail, inputName, inputFirstName, userPassword, inputPhoneNumber, inputPostalAddress, salt, inputUserId], (err, result, fields) => {
+                                getConnection.on('error', function (err) {
                                     console.log('[MySQL ERROR]', err);
                                     res.status(HttpStatus.INTERNAL_SERVER_ERROR).send('Register error: ', err);
                                 });
-                                if (result.affectedRows ) {
+                                if (result.affectedRows) {
                                     res.status(HttpStatus.CREATED).send('User Updated Successfully');
                                 }
                             });
-                        } else{
+                        } else {
                             res.status(HttpStatus.BAD_REQUEST).send('Token and UserId do not match');
                         }
                     });
@@ -286,5 +187,6 @@ router.post('/users/update',(req, res, next)=> {
 
 
 });
+
 
 module.exports = router;
